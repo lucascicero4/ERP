@@ -1,0 +1,28 @@
+{
+  "name": "ERP Lucas",
+  "short_name": "ERP Lucas",
+  "description": "Sistema de control de gastos y patrimonio personal v5.1",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["finance", "productivity"],
+  "lang": "es-AR",
+  "scope": "/",
+  "prefer_related_applications": false
+}

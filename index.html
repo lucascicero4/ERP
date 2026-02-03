@@ -1,0 +1,1434 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0a0a0a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ERP Lucas">
+    <title>ERP Lucas</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="icon" type="image/png" href="icon-192.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0a0a0a;
+            --bg-secondary: #111111;
+            --bg-card: #161616;
+            --bg-hover: #1c1c1c;
+            --bg-modal: rgba(0,0,0,0.85);
+            --border: #262626;
+            --border-light: #333;
+            --text-primary: #fff;
+            --text-secondary: #a3a3a3;
+            --text-muted: #737373;
+            --green: #22c55e;
+            --green-dim: rgba(34,197,94,0.15);
+            --red: #ef4444;
+            --red-dim: rgba(239,68,68,0.15);
+            --blue: #3b82f6;
+            --blue-dim: rgba(59,130,246,0.15);
+            --yellow: #eab308;
+            --yellow-dim: rgba(234,179,8,0.15);
+            --purple: #a855f7;
+            --purple-dim: rgba(168,85,247,0.15);
+            --cyan: #06b6d4;
+            --cyan-dim: rgba(6,182,212,0.15);
+            --orange: #f97316;
+            --orange-dim: rgba(249,115,22,0.15);
+        }
+        * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+        body { font-family:'Inter',system-ui,sans-serif; background:var(--bg-primary); color:var(--text-primary); min-height:100vh; min-height:100dvh; overflow-x:hidden; }
+        
+        .loading-overlay { position: fixed; inset: 0; background: var(--bg-primary); z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; }
+        .loading-overlay.hidden { display: none; }
+        .loading-spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--green); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-text { color: var(--text-muted); font-size: 14px; }
+
+        .ticker-bar { background: var(--bg-secondary); border-bottom: 1px solid var(--border); overflow: hidden; height: 36px; }
+        .ticker-track { display: flex; width: max-content; animation: tickerScroll 25s linear infinite; }
+        .ticker-group { display: flex; gap: 40px; padding: 0 20px; align-items: center; height: 36px; }
+        @keyframes tickerScroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+        .ticker-item { display: flex; align-items: center; gap: 8px; font-size: 12px; white-space: nowrap; }
+        .ticker-label { color: var(--text-muted); font-weight: 500; }
+        .ticker-value { font-family: 'Space Mono', monospace; font-weight: 600; }
+
+        .header { background: var(--bg-secondary); border-bottom: 1px solid var(--border); padding: 12px 16px; position: sticky; top: 0; z-index: 100; }
+        .header-inner { max-width: 1000px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+        .logo { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 17px; }
+        .logo-icon { width: 32px; height: 32px; background: linear-gradient(135deg, var(--green), var(--cyan)); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+        .sync-badge { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; }
+        .sync-badge:hover { color: var(--text-secondary); }
+        .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+        .sync-dot.syncing { background: var(--yellow); animation: pulse 0.5s infinite; }
+        .sync-dot.error { background: var(--red); }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+        .nav { display: flex; gap: 4px; padding: 10px 16px; background: var(--bg-secondary); border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; }
+        .nav::-webkit-scrollbar { display: none; }
+        .nav-btn { padding: 9px 14px; border-radius: 8px; font-size: 12px; font-weight: 500; color: var(--text-secondary); background: transparent; border: none; cursor: pointer; white-space: nowrap; transition: all 0.2s; }
+        .nav-btn:hover { background: var(--bg-card); color: var(--text-primary); }
+        .nav-btn.active { background: var(--text-primary); color: var(--bg-primary); }
+
+        .main { max-width: 1000px; margin: 0 auto; padding: 16px; padding-bottom: 100px; }
+        .view { display: none; animation: fadeIn 0.25s ease; }
+        .view.active { display: block; }
+        @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+
+        .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+        .card-title { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+
+        .accordion { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; margin-bottom: 14px; overflow: hidden; }
+        .accordion-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; cursor: pointer; transition: background 0.2s; }
+        .accordion-header:hover { background: var(--bg-hover); }
+        .accordion-title { font-size: 13px; font-weight: 600; }
+        .accordion-icon { font-size: 18px; transition: transform 0.3s; }
+        .accordion.open .accordion-icon { transform: rotate(180deg); }
+        .accordion-body { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+        .accordion.open .accordion-body { max-height: 500px; }
+        .accordion-content { padding: 0 16px 16px; }
+        .chart-box { height: 200px; position: relative; }
+
+        .kpi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+        @media (min-width: 600px) { .kpi-grid { grid-template-columns: repeat(3, 1fr); } .kpi-grid.five { grid-template-columns: repeat(5, 1fr); } }
+        .kpi { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; cursor: pointer; transition: all 0.2s; }
+        .kpi:hover { border-color: var(--border-light); transform: translateY(-1px); }
+        .kpi-label { font-size: 10px; color: var(--text-muted); margin-bottom: 4px; }
+        .kpi-value { font-family: 'Space Mono', monospace; font-size: 16px; font-weight: 700; }
+
+        .month-sel { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+        .month-btn { width: 34px; height: 34px; border-radius: 8px; background: var(--bg-card); border: 1px solid var(--border); color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+        .month-btn:hover { background: var(--bg-hover); }
+        .month-display { font-size: 16px; font-weight: 600; min-width: 130px; text-align: center; }
+        .edit-income-btn { margin-left: auto; padding: 6px 12px; border-radius: 6px; background: var(--bg-card); border: 1px solid var(--border); color: var(--text-secondary); font-size: 12px; cursor: pointer; }
+
+        .tx-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .tx-title { font-size: 14px; font-weight: 600; }
+        .tx-more { font-size: 12px; color: var(--green); background: none; border: none; cursor: pointer; }
+        .tx-list { position: relative; }
+        .tx-item { display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); position: relative; transition: transform 0.2s, background 0.2s; cursor: pointer; }
+        .tx-item:last-child { border: none; }
+        .tx-item:hover { background: var(--bg-hover); margin: 0 -16px; padding: 12px 16px; border-radius: 8px; }
+        .tx-item.swiped { transform: translateX(80px); }
+        .tx-delete-bg { position: absolute; left: -80px; top: 0; bottom: 0; width: 80px; background: var(--red); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; border-radius: 8px 0 0 8px; opacity: 0; transition: opacity 0.2s; }
+        .tx-item.swiped .tx-delete-bg { opacity: 1; }
+        .tx-icon { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; margin-right: 12px; flex-shrink: 0; }
+        .tx-info { flex: 1; min-width: 0; }
+        .tx-desc { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .tx-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+        .tx-amount { font-family: 'Space Mono', monospace; font-size: 13px; font-weight: 600; text-align: right; }
+        .tx-currency { font-size: 9px; padding: 2px 5px; border-radius: 4px; margin-left: 6px; font-weight: 600; }
+        .tx-currency.ars { background: var(--cyan-dim); color: var(--cyan); }
+        .tx-currency.usd { background: var(--yellow-dim); color: var(--yellow); }
+        .tx-cuota { font-size: 10px; color: var(--purple); margin-left: 4px; }
+        
+        .cat-comida { background: var(--red-dim); }
+        .cat-servicios { background: var(--blue-dim); }
+        .cat-salidas { background: var(--purple-dim); }
+        .cat-deporte { background: var(--green-dim); }
+        .cat-regalos { background: var(--yellow-dim); }
+        .cat-educacion { background: var(--cyan-dim); }
+        .cat-tarjeta { background: var(--orange-dim); }
+        .cat-otros { background: rgba(115,115,115,0.15); }
+
+        .tabs { display: flex; gap: 4px; margin-bottom: 14px; background: var(--bg-card); padding: 4px; border-radius: 10px; border: 1px solid var(--border); }
+        .tab { flex: 1; padding: 10px; border-radius: 8px; font-size: 13px; font-weight: 500; color: var(--text-secondary); background: transparent; border: none; cursor: pointer; transition: all 0.2s; }
+        .tab.active { background: var(--text-primary); color: var(--bg-primary); }
+        .filters { display: flex; gap: 6px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+        .filters::-webkit-scrollbar { display: none; }
+        .filter-chip { padding: 7px 12px; border-radius: 50px; background: var(--bg-card); border: 1px solid var(--border); color: var(--text-secondary); font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+        .filter-chip.active { background: var(--text-primary); color: var(--bg-primary); border-color: var(--text-primary); }
+
+        .fab { position: fixed; bottom: 90px; right: 20px; width: 56px; height: 56px; border-radius: 50%; background: var(--green); color: #000; border: none; font-size: 28px; cursor: pointer; box-shadow: 0 4px 20px rgba(34,197,94,0.4); z-index: 99; display: flex; align-items: center; justify-content: center; transition: transform 0.2s; }
+        .fab:hover { transform: scale(1.1); }
+        @media (min-width: 768px) { .fab { bottom: 30px; } }
+
+        .pat-total { background: linear-gradient(135deg, var(--bg-card), rgba(34,197,94,0.08)); border: 1px solid var(--green); border-radius: 14px; padding: 18px; margin-bottom: 14px; text-align: center; }
+        .pat-total-label { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+        .pat-total-value { font-family: 'Space Mono', monospace; font-size: 28px; font-weight: 700; color: var(--green); }
+        .pat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 14px; }
+        .pat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; cursor: pointer; transition: all 0.2s; }
+        .pat-card:hover { border-color: var(--border-light); }
+        .pat-card.expanded { grid-column: 1 / -1; }
+        .pat-label { font-size: 11px; color: var(--text-muted); margin-bottom: 3px; }
+        .pat-value { font-family: 'Space Mono', monospace; font-size: 16px; font-weight: 700; }
+        .pat-detail { display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+        .pat-card.expanded .pat-detail { display: block; }
+
+        .inv-item { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 8px; cursor: pointer; }
+        .inv-item:hover { border-color: var(--border-light); }
+        .inv-header { display: flex; justify-content: space-between; align-items: center; }
+        .inv-name { font-size: 14px; font-weight: 500; }
+        .inv-amount { font-family: 'Space Mono', monospace; font-size: 14px; font-weight: 600; color: var(--green); }
+        .inv-details { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-secondary); }
+        .inv-item.expanded .inv-details { display: block; }
+        .inv-detail-row { display: flex; justify-content: space-between; padding: 4px 0; }
+        .inv-actions { display: flex; gap: 8px; margin-top: 10px; }
+        .inv-action-btn { flex: 1; padding: 8px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; border: none; }
+        .inv-action-btn.edit { background: var(--blue-dim); color: var(--blue); }
+        .inv-action-btn.delete { background: var(--red-dim); color: var(--red); }
+
+        .tarjeta-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+        .tarjeta-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; text-align: center; }
+        .tarjeta-card.visa { border-left: 3px solid var(--blue); }
+        .tarjeta-card.master { border-left: 3px solid var(--orange); }
+        .tarjeta-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+        .tarjeta-value { font-family: 'Space Mono', monospace; font-size: 18px; font-weight: 700; }
+
+        .cuotas-item { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 8px; }
+        .cuotas-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .cuotas-name { font-size: 13px; font-weight: 500; }
+        .cuotas-total { font-family: 'Space Mono', monospace; font-size: 13px; color: var(--purple); }
+        .cuotas-progress { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+        .cuotas-bar { height: 100%; background: var(--purple); border-radius: 3px; transition: width 0.3s; }
+        .cuotas-meta { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--text-muted); }
+
+        .annual-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 14px; }
+        @media (min-width: 600px) { .annual-grid { grid-template-columns: repeat(4, 1fr); } }
+        .annual-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; text-align: center; }
+        .annual-label { font-size: 11px; color: var(--text-muted); margin-bottom: 6px; }
+        .annual-value { font-family: 'Space Mono', monospace; font-size: 16px; font-weight: 700; }
+
+        .mov-item { display: flex; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+        .mov-item:last-child { border: none; }
+        .mov-date { color: var(--text-muted); width: 60px; flex-shrink: 0; }
+        .mov-desc { flex: 1; }
+        .mov-badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; margin-left: 8px; background: var(--green-dim); color: var(--green); }
+        .mov-amount { font-family: 'Space Mono', monospace; font-weight: 500; }
+
+        .modal-overlay { position: fixed; inset: 0; background: var(--bg-modal); z-index: 1000; display: none; align-items: flex-end; justify-content: center; padding: 16px; }
+        .modal-overlay.active { display: flex; }
+        @media (min-width: 600px) { .modal-overlay { align-items: center; } }
+        .modal { background: var(--bg-card); border: 1px solid var(--border); border-radius: 20px 20px 0 0; width: 100%; max-width: 400px; max-height: 90vh; overflow-y: auto; animation: slideUp 0.3s ease; }
+        @media (min-width: 600px) { .modal { border-radius: 20px; } }
+        @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+        .modal-title { font-size: 16px; font-weight: 600; }
+        .modal-close { width: 32px; height: 32px; border-radius: 50%; background: var(--bg-secondary); border: none; color: var(--text-primary); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .modal-body { padding: 20px; }
+        .modal-footer { padding: 16px 20px; border-top: 1px solid var(--border); display: flex; gap: 10px; }
+
+        .form-group { margin-bottom: 14px; }
+        .form-label { display: block; font-size: 11px; font-weight: 500; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 6px; }
+        .form-input, .form-select { width: 100%; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; font-size: 14px; color: var(--text-primary); font-family: inherit; }
+        .form-input:focus, .form-select:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 3px var(--green-dim); }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .form-row.three { grid-template-columns: 1fr 1fr 1fr; }
+        .amount-wrap { position: relative; }
+        .amount-prefix { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-family: 'Space Mono', monospace; }
+        .amount-input { padding-left: 32px; font-family: 'Space Mono', monospace; font-size: 20px; font-weight: 700; }
+        .form-hint { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+        .form-hint.highlight { color: var(--yellow); }
+        .form-hint.purple { color: var(--purple); }
+
+        .toggle-group { display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--bg-secondary); border-radius: 10px; border: 1px solid var(--border); }
+        .toggle-group.active { border-color: var(--green); background: var(--green-dim); }
+        .toggle-label { flex: 1; font-size: 14px; }
+        .toggle-emoji { font-size: 20px; }
+        .toggle-switch { width: 44px; height: 24px; background: var(--border); border-radius: 12px; position: relative; cursor: pointer; }
+        .toggle-switch.active { background: var(--green); }
+        .toggle-switch::after { content: ''; position: absolute; width: 20px; height: 20px; background: white; border-radius: 50%; top: 2px; left: 2px; transition: transform 0.2s; }
+        .toggle-switch.active::after { transform: translateX(20px); }
+
+        .cat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+        .cat-pill { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px; border-radius: 10px; background: var(--bg-secondary); border: 2px solid var(--border); cursor: pointer; }
+        .cat-pill.active { border-color: var(--green); background: var(--green-dim); }
+        .cat-pill input { display: none; }
+        .cat-pill-icon { font-size: 18px; }
+        .cat-pill-name { font-size: 9px; font-weight: 500; color: var(--text-secondary); }
+        .cat-pill.active .cat-pill-name { color: var(--green); }
+
+        .btn { flex: 1; padding: 12px 16px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; font-family: inherit; }
+        .btn-primary { background: var(--green); color: #000; }
+        .btn-secondary { background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border); }
+        .btn-danger { background: var(--red); color: #fff; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .add-btn { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px; border-radius: 10px; background: var(--green-dim); border: 1px dashed var(--green); color: var(--green); font-size: 13px; font-weight: 500; cursor: pointer; width: 100%; }
+
+        .action-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+        .action-btn { flex: 1; min-width: 100px; padding: 10px; border-radius: 10px; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px dashed; display: flex; align-items: center; justify-content: center; gap: 6px; }
+        .action-btn.move { background: var(--blue-dim); border-color: var(--blue); color: var(--blue); }
+        .action-btn.withdraw { background: var(--red-dim); border-color: var(--red); color: var(--red); }
+        .action-btn.deposit { background: var(--green-dim); border-color: var(--green); color: var(--green); }
+
+        .toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--green); color: #000; padding: 12px 22px; border-radius: 50px; font-weight: 600; font-size: 13px; opacity: 0; transition: all 0.3s; z-index: 1001; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .toast.error { background: var(--red); color: #fff; }
+
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg-secondary); border-top: 1px solid var(--border); display: flex; justify-content: space-around; padding: 8px 0; padding-bottom: max(8px, env(safe-area-inset-bottom)); z-index: 100; }
+        .bnav-item { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 12px; color: var(--text-muted); background: none; border: none; font-size: 10px; font-weight: 500; cursor: pointer; font-family: inherit; }
+        .bnav-item.active { color: var(--green); }
+        .bnav-item svg { width: 22px; height: 22px; }
+        @media (min-width: 768px) { .bottom-nav { display: none; } }
+        @media (max-width: 767px) { .nav { display: none; } }
+
+        .empty { text-align: center; padding: 40px 16px; color: var(--text-muted); }
+        .detail-section { background: var(--bg-secondary); border-radius: 10px; padding: 12px; margin-top: 10px; }
+        .detail-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+        .detail-row:last-child { border: none; }
+        .detail-value { font-family: 'Space Mono', monospace; font-weight: 500; }
+    </style>
+</head>
+<body>
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text" id="loadingText">Conectando...</div>
+    </div>
+
+    <div class="ticker-bar">
+        <div class="ticker-track">
+            <div class="ticker-group">
+                <div class="ticker-item"><span class="ticker-label">BTC</span><span class="ticker-value" id="tickerBTC">$--</span></div>
+                <div class="ticker-item"><span class="ticker-label">S&P 500</span><span class="ticker-value" id="tickerSP500">--</span></div>
+                <div class="ticker-item"><span class="ticker-label">Dólar BNA</span><span class="ticker-value" id="tickerUSD">$--</span></div>
+                <div class="ticker-item"><span class="ticker-label">Oro</span><span class="ticker-value" id="tickerGold">$--</span></div>
+            </div>
+            <div class="ticker-group">
+                <div class="ticker-item"><span class="ticker-label">BTC</span><span class="ticker-value">$--</span></div>
+                <div class="ticker-item"><span class="ticker-label">S&P 500</span><span class="ticker-value">--</span></div>
+                <div class="ticker-item"><span class="ticker-label">Dólar BNA</span><span class="ticker-value">$--</span></div>
+                <div class="ticker-item"><span class="ticker-label">Oro</span><span class="ticker-value">$--</span></div>
+            </div>
+        </div>
+    </div>
+
+    <header class="header">
+        <div class="header-inner">
+            <div class="logo"><div class="logo-icon">💰</div><span>ERP Lucas</span></div>
+            <div style="display:flex;align-items:center;gap:12px">
+                <button onclick="runDiagnostic()" style="background:var(--bg-card);border:1px solid var(--border);color:var(--text-muted);padding:4px 8px;border-radius:6px;font-size:11px;cursor:pointer">🔧 Test</button>
+                <div class="sync-badge" onclick="syncFromSheet()">
+                    <span class="sync-dot" id="syncDot"></span>
+                    <span id="syncText">Conectando</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <nav class="nav">
+        <button class="nav-btn active" data-view="dashboard">Dashboard</button>
+        <button class="nav-btn" data-view="historial">Historial</button>
+        <button class="nav-btn" data-view="tarjeta">Tarjeta</button>
+        <button class="nav-btn" data-view="patrimonio">Patrimonio</button>
+        <button class="nav-btn" data-view="anual">Anual</button>
+    </nav>
+
+    <main class="main" id="mainContent"></main>
+
+    <nav class="bottom-nav">
+        <button class="bnav-item active" data-view="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Home</button>
+        <button class="bnav-item" data-view="historial"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Historial</button>
+        <button class="bnav-item" data-view="tarjeta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>Tarjeta</button>
+        <button class="bnav-item" data-view="patrimonio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>USD</button>
+        <button class="bnav-item" data-view="anual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Anual</button>
+    </nav>
+
+    <div class="toast" id="toast"></div>
+    <div class="modal-overlay" id="modalOverlay"><div class="modal" id="modalContent"></div></div>
+
+    <script>
+    // ============================================================
+    // CONFIG - PEGAR TU URL AQUÍ
+    // ============================================================
+    const CONFIG = {
+        SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbwUxSF8wq7De5M_qQVFY94GeKlJHCzPQnX5Yxt6--uzeapZjUjf5NgKjEYEkcGlXvQHNQ/exec', // <-- PEGAR TU GOOGLE APPS SCRIPT URL AQUÍ
+        FORM_URL: 'https://docs.google.com/forms/d/e/1FAIpQLSfzB0u8w1GjVxpVx1a83fMktjq9nOWKbfz1rRmo5Ijw2GGt7w/viewform', // Google Form para agregar gastos
+        FORM_INGRESOS_URL: 'https://docs.google.com/forms/d/e/1FAIpQLSe_MNZXzVxC4NBhs3jjJdMM8ZBSHqhN-cGy3jE096IK_WYonw/viewform', // Google Form para ingresos
+        VERSION: '5.2'
+    };
+
+    const CATS = {
+        Comida: { icon: '🍔', color: '#ef4444' },
+        Servicios: { icon: '⚡', color: '#3b82f6' },
+        Salidas: { icon: '🎉', color: '#a855f7' },
+        Deporte: { icon: '⚽', color: '#22c55e' },
+        Regalos: { icon: '🎁', color: '#eab308' },
+        Educación: { icon: '📚', color: '#06b6d4' },
+        Tarjeta: { icon: '💳', color: '#f97316' },
+        Otros: { icon: '📦', color: '#737373' }
+    };
+
+    const PAYMENTS = ['Débito/Transferencia', 'VISA (8043)', 'MASTER (9714)', 'Efectivo'];
+    const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+    let state = {
+        currentView: 'dashboard',
+        currentMonth: new Date().getMonth(),
+        currentYear: new Date().getFullYear(),
+        expenses: [],
+        monthlyIncome: {},
+        patrimonio: { bbva: 0, caja: 0, efectivo: 0 },
+        inversiones: [],
+        movimientos: [],
+        dolaresAhorro: 0,
+        cotizaciones: { btc: 0, sp500: 0, usd: 0, gold: 0 }
+    };
+
+    // ============================================================
+    // DATE UTILITIES
+    // ============================================================
+    function getArgentinaDate() {
+        return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' }));
+    }
+
+    function getArgentinaDateString() {
+        const d = getArgentinaDate();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    function getLastThursday(year, month) {
+        const lastDay = new Date(year, month + 1, 0);
+        const dayOfWeek = lastDay.getDay();
+        const diff = (dayOfWeek >= 4) ? (dayOfWeek - 4) : (dayOfWeek + 3);
+        return new Date(year, month + 1, 0 - diff);
+    }
+
+    function calcularMesPago(fechaCompra) {
+        try {
+            if (!fechaCompra) return { month: new Date().getMonth(), year: new Date().getFullYear() };
+            const fecha = new Date(fechaCompra + 'T12:00:00');
+            if (isNaN(fecha)) return { month: new Date().getMonth(), year: new Date().getFullYear() };
+            const year = fecha.getFullYear();
+            const month = fecha.getMonth();
+            const cierreEsteMes = getLastThursday(year, month);
+            if (fecha <= cierreEsteMes) {
+                const vtoMonth = month + 1;
+                if (vtoMonth > 11) return { month: 0, year: year + 1 };
+                return { month: vtoMonth, year };
+            } else {
+                const vtoMonth = month + 2;
+                if (vtoMonth > 11) return { month: vtoMonth - 12, year: year + 1 };
+                return { month: vtoMonth, year };
+            }
+        } catch { return { month: new Date().getMonth(), year: new Date().getFullYear() }; }
+    }
+
+    function getMesesPago(fechaCompra, cuotas) {
+        const meses = [];
+        let mp = calcularMesPago(fechaCompra);
+        for (let i = 0; i < cuotas; i++) {
+            meses.push(`${mp.year}-${String(mp.month + 1).padStart(2, '0')}`);
+            mp.month++;
+            if (mp.month > 11) { mp.month = 0; mp.year++; }
+        }
+        return meses;
+    }
+
+    function getMesPagoKey(m, y) { return `${y}-${String(m + 1).padStart(2, '0')}`; }
+
+    // ============================================================
+    // API FUNCTIONS
+    // ============================================================
+    async function apiGet(action) {
+        if (!CONFIG.SCRIPT_URL) {
+            console.error('SCRIPT_URL no configurado');
+            return null;
+        }
+        try {
+            const res = await fetch(`${CONFIG.SCRIPT_URL}?action=${action}`);
+            const data = await res.json();
+            console.log('API GET', action, data.success);
+            return data;
+        } catch (e) {
+            console.error('API GET error:', e);
+            return null;
+        }
+    }
+
+    async function apiPost(action, data) {
+        if (!CONFIG.SCRIPT_URL) {
+            toast('Configurá SCRIPT_URL en el código', true);
+            return { success: false, error: 'No SCRIPT_URL' };
+        }
+        setSyncStatus('syncing');
+        
+        console.log('📤 API:', action, data);
+        
+        // Usar GET con data codificada en URL (más confiable que POST)
+        try {
+            const encodedData = encodeURIComponent(JSON.stringify(data));
+            const url = `${CONFIG.SCRIPT_URL}?action=${action}&data=${encodedData}`;
+            
+            console.log('🔗 URL length:', url.length);
+            
+            const res = await fetch(url);
+            const result = await res.json();
+            
+            console.log('📥 Result:', result);
+            setSyncStatus(result.success ? 'ok' : 'error');
+            
+            if (!result.success && result.error) {
+                toast('Error: ' + result.error, true);
+            }
+            
+            return result;
+        } catch (e) {
+            console.error('❌ Error:', e);
+            setSyncStatus('error');
+            toast('Error: ' + e.message, true);
+            return { success: false, error: e.message };
+        }
+    }
+
+    function setSyncStatus(status) {
+        const dot = document.getElementById('syncDot');
+        const text = document.getElementById('syncText');
+        if (!dot || !text) return;
+        dot.className = 'sync-dot';
+        if (status === 'syncing') { dot.classList.add('syncing'); text.textContent = 'Sincronizando...'; }
+        else if (status === 'error') { dot.classList.add('error'); text.textContent = 'Error sync'; }
+        else { text.textContent = 'Sincronizado'; }
+    }
+
+    window.syncFromSheet = async function() {
+        setSyncStatus('syncing');
+        document.getElementById('loadingText').textContent = 'Cargando datos...';
+        const result = await apiGet('getAll');
+        if (result && result.success) {
+            state.expenses = result.expenses || [];
+            state.patrimonio = result.patrimonio || { bbva: 0, caja: 0, efectivo: 0 };
+            state.inversiones = result.inversiones || [];
+            state.movimientos = result.movimientos || [];
+            state.monthlyIncome = result.monthlyIncome || {};
+            state.dolaresAhorro = result.config?.dolaresAhorro || 0;
+            saveLocalState();
+            renderCurrentView();
+            setSyncStatus('ok');
+            toast(`✓ ${state.expenses.length} gastos cargados`);
+        } else {
+            setSyncStatus('error');
+            toast('Error al sincronizar: ' + (result?.error || 'sin respuesta'), true);
+        }
+    }
+
+    async function initialLoad() {
+        document.getElementById('loadingText').textContent = 'Conectando...';
+        loadLocalState();
+        if (CONFIG.SCRIPT_URL) {
+            await syncFromSheet();
+        } else {
+            setSyncStatus('error');
+            document.getElementById('syncText').textContent = 'Sin URL';
+            toast('Falta configurar SCRIPT_URL', true);
+        }
+        document.getElementById('loadingOverlay').classList.add('hidden');
+        renderCurrentView();
+        fetchCotizaciones();
+    }
+
+    function loadLocalState() {
+        try {
+            const saved = localStorage.getItem('erp_lucas_v5');
+            if (saved) state = { ...state, ...JSON.parse(saved) };
+        } catch (e) {}
+    }
+
+    function saveLocalState() {
+        try { localStorage.setItem('erp_lucas_v5', JSON.stringify(state)); } catch (e) {}
+    }
+
+    // ============================================================
+    // UTILITIES
+    // ============================================================
+    const fmt = (n, c = 'ARS') => (c === 'USD' ? 'U$S ' : '$') + Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmtShort = (n, c = 'ARS') => (c === 'USD' ? 'U$S ' : '$') + Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    const fmtDate = d => { try { if (!d) return '-'; const dt = new Date(d + 'T12:00:00'); if (isNaN(dt)) return d; const today = getArgentinaDate(); if (dt.toDateString() === today.toDateString()) return 'Hoy'; const yday = new Date(today); yday.setDate(yday.getDate() - 1); if (dt.toDateString() === yday.toDateString()) return 'Ayer'; return dt.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' }); } catch { return d || '-'; } };
+    const fmtShortDate = d => { try { return new Date(d + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }); } catch { return ''; } };
+    const fmtFullDate = d => { try { if (!d) return getArgentinaDateString(); if (d.includes('T')) return d.split('T')[0]; return d; } catch { return ''; } };
+    const getMonthKey = (m, y) => `${y}-${String(m + 1).padStart(2, '0')}`;
+    const getMonthIncome = (m, y) => state.monthlyIncome[getMonthKey(m, y)] || 0;
+    
+    function getMonthExpenses(m, y) {
+        const key = getMonthKey(m, y);
+        return state.expenses.filter(e => {
+            // Si tiene mesPago explícito, usarlo
+            if (e.mesPago) return e.mesPago === key;
+            
+            const isTarjeta = e.payment?.includes('VISA') || e.payment?.includes('MASTER');
+            
+            if (isTarjeta) {
+                // Para tarjeta sin mesPago, calcular
+                const mp = calcularMesPago(e.date);
+                return mp.month === m && mp.year === y;
+            } else {
+                // Para NO tarjeta, usar el mes de la fecha de compra
+                if (!e.date) return false;
+                try {
+                    const d = new Date(e.date + 'T12:00:00');
+                    return d.getMonth() === m && d.getFullYear() === y;
+                } catch {
+                    return false;
+                }
+            }
+        });
+    }
+    
+    function getYearExpenses(y) {
+        return state.expenses.filter(e => {
+            if (e.mesPago) return e.mesPago.startsWith(y.toString());
+            const isTarjeta = e.payment?.includes('VISA') || e.payment?.includes('MASTER');
+            if (isTarjeta) {
+                const mp = calcularMesPago(e.date);
+                return mp.year === y;
+            }
+            return new Date(e.date + 'T12:00:00').getFullYear() === y;
+        });
+    }
+
+    function getCuotasPendientes() {
+        const grupos = {};
+        
+        // Filtrar gastos con cuotas
+        const gastosConCuotas = state.expenses.filter(e => e.totalCuotas > 1);
+        
+        gastosConCuotas.forEach(e => {
+            // Generar clave de grupo: usar idGrupo si existe, sino generar una clave única
+            let groupKey;
+            if (e.idGrupo) {
+                groupKey = e.idGrupo;
+            } else {
+                // Extraer descripción base (sin "(cuota X/Y)")
+                const descBase = (e.description || e.category || '').replace(/\s*\(cuota \d+\/\d+\)\s*/gi, '').trim();
+                // Usar fecha + descripción base + totalCuotas + currency + payment como clave
+                groupKey = `${e.date}_${descBase}_${e.totalCuotas}_${e.currency}_${e.payment}`;
+            }
+            
+            if (!grupos[groupKey]) {
+                // Extraer nombre limpio (sin "(cuota X/Y)")
+                const nombreLimpio = (e.description || e.category || '').replace(/\s*\(cuota \d+\/\d+\)\s*/gi, '').trim();
+                grupos[groupKey] = {
+                    nombre: nombreLimpio || e.category,
+                    totalCuotas: e.totalCuotas,
+                    montoTotal: 0,
+                    cuotas: [],
+                    currency: e.currency,
+                    payment: e.payment,
+                    fechaCompra: e.date
+                };
+            }
+            grupos[groupKey].cuotas.push(e);
+            grupos[groupKey].montoTotal += e.amount;
+        });
+        
+        // Filtrar grupos que tienen cuotas pendientes (mesPago >= mes actual)
+        const hoy = getMonthKey(getArgentinaDate().getMonth(), getArgentinaDate().getFullYear());
+        return Object.values(grupos).filter(g => {
+            return g.cuotas.some(c => c.mesPago >= hoy);
+        });
+    }
+    
+    const getCatTotals = (list, cur = null) => { const t = {}; Object.keys(CATS).forEach(c => t[c] = 0); list.forEach(e => { if (cur && e.currency !== cur) return; t[e.category in CATS ? e.category : 'Otros'] += e.amount; }); return t; };
+    const getPaymentTotals = (list, cur = null) => { const t = {}; PAYMENTS.forEach(p => t[p] = 0); list.forEach(e => { if (cur && e.currency !== cur) return; t[e.payment] = (t[e.payment] || 0) + e.amount; }); return t; };
+    const getTarjetaTotal = (list, cur, card = null) => list.filter(e => e.currency === cur && (card ? e.payment?.includes(card) : (e.payment?.includes('VISA') || e.payment?.includes('MASTER')))).reduce((s, e) => s + e.amount, 0);
+    const getTotalInversiones = () => state.inversiones.reduce((s, i) => s + i.monto, 0);
+    const getTotalPatrimonio = () => state.patrimonio.bbva + state.patrimonio.caja + state.patrimonio.efectivo + getTotalInversiones();
+    const toast = (msg, err = false) => { const t = document.getElementById('toast'); t.textContent = msg; t.className = 'toast' + (err ? ' error' : ''); t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000); };
+    const normalizeCat = c => (c || 'otros').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    // ============================================================
+    // COTIZACIONES
+    // ============================================================
+    async function fetchCotizaciones() {
+        try {
+            const [dolarRes, btcRes] = await Promise.all([
+                fetch('https://dolarapi.com/v1/dolares/oficial').catch(() => null),
+                fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd').catch(() => null)
+            ]);
+            if (dolarRes?.ok) { const d = await dolarRes.json(); state.cotizaciones.usd = d.venta || 0; }
+            if (btcRes?.ok) { const b = await btcRes.json(); state.cotizaciones.btc = b.bitcoin?.usd || 0; }
+            state.cotizaciones.sp500 = 6050;
+            state.cotizaciones.gold = 2750;
+            updateTickerUI();
+        } catch (e) {}
+    }
+
+    function updateTickerUI() {
+        const u = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+        u('tickerBTC', '$' + state.cotizaciones.btc.toLocaleString('en-US', { maximumFractionDigits: 0 }));
+        u('tickerSP500', state.cotizaciones.sp500.toLocaleString('en-US'));
+        u('tickerUSD', '$' + state.cotizaciones.usd.toLocaleString('es-AR', { maximumFractionDigits: 2 }));
+        u('tickerGold', '$' + state.cotizaciones.gold.toLocaleString('en-US'));
+    }
+
+    // ============================================================
+    // NAVIGATION
+    // ============================================================
+    window.switchView = function(view) {
+        state.currentView = view;
+        document.querySelectorAll('.nav-btn, .bnav-item').forEach(btn => btn.classList.toggle('active', btn.dataset.view === view));
+        renderCurrentView();
+    }
+
+    function renderCurrentView() {
+        const main = document.getElementById('mainContent');
+        try {
+            switch (state.currentView) {
+                case 'dashboard': main.innerHTML = renderDashboard(); initDashboardEvents(); break;
+                case 'historial': main.innerHTML = renderHistorial(); initHistorialEvents(); break;
+                case 'tarjeta': main.innerHTML = renderTarjeta(); break;
+                case 'patrimonio': main.innerHTML = renderPatrimonio(); initPatrimonioEvents(); break;
+                case 'anual': main.innerHTML = renderAnual(); initAnualEvents(); break;
+            }
+        } catch (err) {
+            console.error('Render error:', err);
+            main.innerHTML = `<div class="card"><p style="color:var(--red)">Error: ${err.message}</p><button class="btn btn-primary" onclick="location.reload()">Recargar</button></div>`;
+        }
+    }
+
+    // ============================================================
+    // DASHBOARD
+    // ============================================================
+    function renderDashboard() {
+        const list = getMonthExpenses(state.currentMonth, state.currentYear);
+        const income = getMonthIncome(state.currentMonth, state.currentYear);
+        
+        // Gastos ARS = Solo Efectivo + Débito/Transferencia (NO tarjeta)
+        const gastosARS = list.filter(e => e.currency === 'ARS' && !e.payment?.includes('VISA') && !e.payment?.includes('MASTER')).reduce((s, e) => s + e.amount, 0);
+        
+        // Tarjeta separada
+        const tarjetaARS = getTarjetaTotal(list, 'ARS');
+        const tarjetaUSD = getTarjetaTotal(list, 'USD');
+        
+        // Balance = Ingresos - Gastos ARS - Tarjeta ARS (Tarjeta USD no afecta)
+        const balance = income - gastosARS - tarjetaARS;
+
+        return `
+            <div class="view active">
+                <div class="month-sel">
+                    <button class="month-btn" id="prevMonth">‹</button>
+                    <span class="month-display">${MONTHS[state.currentMonth]} ${state.currentYear}</span>
+                    <button class="month-btn" id="nextMonth">›</button>
+                    <button class="edit-income-btn" id="editIncomeBtn">✏️ Ingreso</button>
+                </div>
+                <div class="kpi-grid five">
+                    <div class="kpi"><div class="kpi-label">💵 Ingresos</div><div class="kpi-value" style="color:var(--green)">${fmtShort(income)}</div></div>
+                    <div class="kpi"><div class="kpi-label">📉 Gastos ARS</div><div class="kpi-value" style="color:var(--red)">${fmtShort(gastosARS)}</div></div>
+                    <div class="kpi"><div class="kpi-label">📊 Balance</div><div class="kpi-value" style="color:${balance >= 0 ? 'var(--green)' : 'var(--red)'}">${fmtShort(balance)}</div></div>
+                    <div class="kpi" onclick="switchView('tarjeta')"><div class="kpi-label">💳 Tarjeta ARS</div><div class="kpi-value" style="color:var(--cyan)">${fmtShort(tarjetaARS)}</div></div>
+                    <div class="kpi" onclick="switchView('tarjeta')"><div class="kpi-label">💳 Tarjeta USD</div><div class="kpi-value" style="color:var(--yellow)">${fmt(tarjetaUSD, 'USD')}</div></div>
+                </div>
+                <div class="accordion" id="accCatARS"><div class="accordion-header"><span class="accordion-title">🥧 Categorías ARS</span><span class="accordion-icon">▼</span></div><div class="accordion-body"><div class="accordion-content"><div class="chart-box"><canvas id="chartCatARS"></canvas></div></div></div></div>
+                <div class="accordion" id="accCatUSD"><div class="accordion-header"><span class="accordion-title">🥧 Categorías USD</span><span class="accordion-icon">▼</span></div><div class="accordion-body"><div class="accordion-content"><div class="chart-box"><canvas id="chartCatUSD"></canvas></div></div></div></div>
+                <div class="accordion" id="accPayARS"><div class="accordion-header"><span class="accordion-title">💳 Medios ARS</span><span class="accordion-icon">▼</span></div><div class="accordion-body"><div class="accordion-content"><div class="chart-box"><canvas id="chartPayARS"></canvas></div></div></div></div>
+                <div class="accordion" id="accPayUSD"><div class="accordion-header"><span class="accordion-title">💳 Medios USD</span><span class="accordion-icon">▼</span></div><div class="accordion-body"><div class="accordion-content"><div class="chart-box"><canvas id="chartPayUSD"></canvas></div></div></div></div>
+                <div class="card">
+                    <div class="tx-header"><span class="tx-title">Últimos Movimientos</span><button class="tx-more" onclick="switchView('historial')">Ver todos →</button></div>
+                    <div class="tx-list">${renderTransactionList(list.slice(0, 5))}</div>
+                </div>
+            </div>
+        `;
+    }
+
+    function initDashboardEvents() {
+        document.getElementById('prevMonth')?.addEventListener('click', () => { state.currentMonth--; if (state.currentMonth < 0) { state.currentMonth = 11; state.currentYear--; } renderCurrentView(); });
+        document.getElementById('nextMonth')?.addEventListener('click', () => { state.currentMonth++; if (state.currentMonth > 11) { state.currentMonth = 0; state.currentYear++; } renderCurrentView(); });
+        document.getElementById('editIncomeBtn')?.addEventListener('click', showIncomeModal);
+        document.querySelectorAll('.accordion').forEach(acc => {
+            acc.querySelector('.accordion-header').addEventListener('click', () => { acc.classList.toggle('open'); if (acc.classList.contains('open')) setTimeout(() => renderAccordionChart(acc.id), 100); });
+        });
+    }
+
+    function renderAccordionChart(accId) {
+        const list = getMonthExpenses(state.currentMonth, state.currentYear);
+        if (accId === 'accCatARS') renderPieChart('chartCatARS', getCatTotals(list, 'ARS'));
+        if (accId === 'accCatUSD') renderPieChart('chartCatUSD', getCatTotals(list, 'USD'));
+        if (accId === 'accPayARS') renderPieChart('chartPayARS', getPaymentTotals(list, 'ARS'), true);
+        if (accId === 'accPayUSD') renderPieChart('chartPayUSD', getPaymentTotals(list, 'USD'), true);
+    }
+
+    function renderPieChart(canvasId, data, isPay = false) {
+        const ctx = document.getElementById(canvasId)?.getContext('2d');
+        if (!ctx) return;
+        const labels = Object.keys(data).filter(k => data[k] > 0);
+        const values = labels.map(k => data[k]);
+        if (!values.length) { ctx.font = '14px Inter'; ctx.fillStyle = '#737373'; ctx.textAlign = 'center'; ctx.fillText('Sin datos', ctx.canvas.width / 2, ctx.canvas.height / 2); return; }
+        const colors = isPay ? ['#3b82f6', '#eab308', '#f97316', '#22c55e'] : labels.map(k => CATS[k]?.color || '#737373');
+        if (window['chart_' + canvasId]) window['chart_' + canvasId].destroy();
+        window['chart_' + canvasId] = new Chart(ctx, { type: 'doughnut', data: { labels, datasets: [{ data: values, backgroundColor: colors, borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#a3a3a3', font: { size: 11 }, usePointStyle: true } } }, cutout: '55%' } });
+    }
+
+    // ============================================================
+    // HISTORIAL
+    // ============================================================
+    function renderHistorial() {
+        const sorted = [...state.expenses].sort((a, b) => new Date(b.date) - new Date(a.date));
+        return `
+            <div class="view active" id="historialView">
+                <div class="tabs"><button class="tab active" data-currency="all">Todos</button><button class="tab" data-currency="ARS">ARS</button><button class="tab" data-currency="USD">USD</button></div>
+                <div class="filters" id="filters"><button class="filter-chip active" data-filter="all">Todos</button>${Object.entries(CATS).map(([name, { icon }]) => `<button class="filter-chip" data-filter="${name}">${icon} ${name}</button>`).join('')}</div>
+                <div class="card"><div class="tx-list" id="historialList">${sorted.length > 0 ? renderTransactionList(sorted.slice(0, 50), true) : '<div class="empty"><p>No hay gastos</p></div>'}</div></div>
+            </div>
+            <button class="fab" onclick="openGoogleForm()" title="Agregar gasto via Google Forms">+</button>
+        `;
+    }
+
+    function initHistorialEvents() {
+        let curCurrency = 'all', curFilter = 'all';
+        const updateList = () => {
+            let list = [...state.expenses].sort((a, b) => new Date(b.date) - new Date(a.date));
+            if (curCurrency !== 'all') list = list.filter(e => e.currency === curCurrency);
+            if (curFilter !== 'all') list = list.filter(e => e.category === curFilter);
+            const c = document.getElementById('historialList');
+            if (c) { c.innerHTML = list.length ? renderTransactionList(list.slice(0, 50), true) : '<div class="empty"><p>No hay gastos</p></div>'; initSwipeDelete(); }
+        };
+        document.querySelectorAll('#historialView .tab').forEach(tab => tab.addEventListener('click', () => { document.querySelectorAll('#historialView .tab').forEach(t => t.classList.remove('active')); tab.classList.add('active'); curCurrency = tab.dataset.currency; updateList(); }));
+        document.querySelectorAll('#historialView .filter-chip').forEach(chip => chip.addEventListener('click', () => { document.querySelectorAll('#historialView .filter-chip').forEach(c => c.classList.remove('active')); chip.classList.add('active'); curFilter = chip.dataset.filter; updateList(); }));
+        initSwipeDelete();
+    }
+
+    function renderTransactionList(list, swipeable = false) {
+        if (!list || !list.length) return '<div class="empty"><p>No hay gastos</p></div>';
+        try {
+            return list.map(e => {
+                const isTarjeta = e.payment?.includes('VISA') || e.payment?.includes('MASTER');
+                const cuotaLabel = (e.totalCuotas > 1) ? `(${e.cuotaActual}/${e.totalCuotas})` : '';
+                return `
+                <div class="tx-item${swipeable ? ' swipeable' : ''}" data-id="${e.id || 0}" data-group="${e.idGrupo || ''}">
+                    ${swipeable ? '<div class="tx-delete-bg">🗑️</div>' : ''}
+                    <div class="tx-icon cat-${normalizeCat(e.category)}">${CATS[e.category]?.icon || '📦'}</div>
+                    <div class="tx-info">
+                        <div class="tx-desc">${e.description || e.category || '-'}${cuotaLabel ? `<span class="tx-cuota">${cuotaLabel}</span>` : ''}</div>
+                        <div class="tx-meta">${fmtDate(e.date)} · ${e.payment || 'Efectivo'}</div>
+                    </div>
+                    <div class="tx-amount" style="color:var(--red)">-${e.currency === 'USD' ? fmt(e.amount, 'USD') : fmtShort(e.amount)}<span class="tx-currency ${(e.currency || 'ars').toLowerCase()}">${e.currency || 'ARS'}</span></div>
+                </div>
+            `;
+            }).join('');
+        } catch (err) {
+            console.error('Error rendering transactions:', err);
+            return '<div class="empty"><p>Error al cargar</p></div>';
+        }
+    }
+
+    function initSwipeDelete() {
+        document.querySelectorAll('.tx-item.swipeable').forEach(item => {
+            let startX = 0, swiped = false;
+            item.addEventListener('touchstart', e => startX = e.touches[0].clientX);
+            item.addEventListener('touchmove', e => { if (e.touches[0].clientX - startX > 50 && !swiped) { item.classList.add('swiped'); swiped = true; } });
+            item.addEventListener('touchend', () => { if (swiped) setTimeout(() => { if (confirm('¿Eliminar?')) deleteExpense(parseInt(item.dataset.id)); else { item.classList.remove('swiped'); swiped = false; } }, 100); });
+            item.addEventListener('click', e => { if (!swiped) showEditExpenseModal(parseInt(item.dataset.id)); });
+        });
+    }
+
+    async function deleteExpense(id) {
+        const exp = state.expenses.find(e => e.id === id);
+        if (!exp) {
+            toast('Gasto no encontrado', true);
+            return;
+        }
+        
+        // Usar rowIndex para eliminar en el Sheet
+        const rowIndex = exp.rowIndex;
+        if (!rowIndex) {
+            toast('No se puede eliminar (sin rowIndex)', true);
+            return;
+        }
+        
+        const result = await apiPost('deleteExpense', { rowIndex });
+        if (result?.success) {
+            state.expenses = state.expenses.filter(e => e.id !== id);
+            saveLocalState();
+            renderCurrentView();
+            toast('✓ Eliminado');
+        } else {
+            toast('Error: ' + (result?.error || 'desconocido'), true);
+        }
+    }
+
+    // ============================================================
+    // TARJETA
+    // ============================================================
+    
+    // Calcular proyección de saldos futuros (próximos 6 meses)
+    function getProyeccionSaldosFuturos() {
+        const proyeccion = [];
+        const hoy = getArgentinaDate();
+        
+        for (let i = 0; i < 6; i++) {
+            let m = hoy.getMonth() + i;
+            let y = hoy.getFullYear();
+            while (m > 11) { m -= 12; y++; }
+            
+            const mesKey = getMonthKey(m, y);
+            const expensesMes = state.expenses.filter(e => e.mesPago === mesKey);
+            const tarjetaExpenses = expensesMes.filter(e => e.payment?.includes('VISA') || e.payment?.includes('MASTER'));
+            
+            const visaARS = tarjetaExpenses.filter(e => e.currency === 'ARS' && e.payment?.includes('VISA')).reduce((s, e) => s + e.amount, 0);
+            const visaUSD = tarjetaExpenses.filter(e => e.currency === 'USD' && e.payment?.includes('VISA')).reduce((s, e) => s + e.amount, 0);
+            const masterARS = tarjetaExpenses.filter(e => e.currency === 'ARS' && e.payment?.includes('MASTER')).reduce((s, e) => s + e.amount, 0);
+            const masterUSD = tarjetaExpenses.filter(e => e.currency === 'USD' && e.payment?.includes('MASTER')).reduce((s, e) => s + e.amount, 0);
+            
+            proyeccion.push({
+                mes: MONTHS[m].substring(0, 3),
+                mesKey: mesKey,
+                visaARS, visaUSD, masterARS, masterUSD,
+                totalARS: visaARS + masterARS,
+                totalUSD: visaUSD + masterUSD
+            });
+        }
+        
+        return proyeccion;
+    }
+    
+    function renderTarjeta() {
+        const list = getMonthExpenses(state.currentMonth, state.currentYear);
+        const visaARS = getTarjetaTotal(list, 'ARS', 'VISA'), visaUSD = getTarjetaTotal(list, 'USD', 'VISA');
+        const masterARS = getTarjetaTotal(list, 'ARS', 'MASTER'), masterUSD = getTarjetaTotal(list, 'USD', 'MASTER');
+        const tarjetaExpenses = list.filter(e => e.payment?.includes('VISA') || e.payment?.includes('MASTER')).sort((a, b) => new Date(b.date) - new Date(a.date));
+        const cuotasPendientes = getCuotasPendientes();
+        const proyeccion = getProyeccionSaldosFuturos();
+        
+        return `
+            <div class="view active">
+                <div class="month-sel" style="margin-bottom:16px"><button class="month-btn" onclick="changeTarjetaMonth(-1)">‹</button><span class="month-display">${MONTHS[state.currentMonth]} ${state.currentYear}</span><button class="month-btn" onclick="changeTarjetaMonth(1)">›</button></div>
+                <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px;text-align:center">💡 Gastos a pagar en ${MONTHS[state.currentMonth]}</p>
+                
+                <h3 style="font-size:14px;color:var(--text-muted);margin-bottom:12px">VISA (8043)</h3>
+                <div class="tarjeta-summary"><div class="tarjeta-card visa"><div class="tarjeta-label">Deuda ARS</div><div class="tarjeta-value" style="color:var(--cyan)">${fmtShort(visaARS)}</div></div><div class="tarjeta-card visa"><div class="tarjeta-label">Deuda USD</div><div class="tarjeta-value" style="color:var(--yellow)">${fmt(visaUSD, 'USD')}</div></div></div>
+                
+                <h3 style="font-size:14px;color:var(--text-muted);margin-bottom:12px">MASTERCARD (9714)</h3>
+                <div class="tarjeta-summary"><div class="tarjeta-card master"><div class="tarjeta-label">Deuda ARS</div><div class="tarjeta-value" style="color:var(--cyan)">${fmtShort(masterARS)}</div></div><div class="tarjeta-card master"><div class="tarjeta-label">Deuda USD</div><div class="tarjeta-value" style="color:var(--yellow)">${fmt(masterUSD, 'USD')}</div></div></div>
+                
+                <div class="card" style="margin-top:16px"><div class="card-title">Resumen Total</div><div class="detail-section"><div class="detail-row"><span>Total ARS</span><span class="detail-value" style="color:var(--cyan)">${fmtShort(visaARS + masterARS)}</span></div><div class="detail-row"><span>Total USD</span><span class="detail-value" style="color:var(--yellow)">${fmt(visaUSD + masterUSD, 'USD')}</span></div></div></div>
+                
+                <!-- NUEVA SECCIÓN: Proyección de Saldos Futuros -->
+                <div class="card">
+                    <div class="card-title">📅 Proyección Próximos Meses</div>
+                    <div style="overflow-x:auto">
+                        <table style="width:100%;border-collapse:collapse;font-size:12px">
+                            <thead>
+                                <tr style="border-bottom:1px solid var(--border)">
+                                    <th style="text-align:left;padding:8px 4px;color:var(--text-muted)">Mes</th>
+                                    <th style="text-align:right;padding:8px 4px;color:var(--cyan)">ARS</th>
+                                    <th style="text-align:right;padding:8px 4px;color:var(--yellow)">USD</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${proyeccion.map((p, i) => `
+                                    <tr style="border-bottom:1px solid var(--border);${i === 0 ? 'background:var(--bg-hover)' : ''}">
+                                        <td style="padding:8px 4px;font-weight:${i === 0 ? '600' : '400'}">${p.mes}${i === 0 ? ' ←' : ''}</td>
+                                        <td style="text-align:right;padding:8px 4px;color:${p.totalARS > 0 ? 'var(--red)' : 'var(--text-muted)'};font-family:'Space Mono',monospace">${p.totalARS > 0 ? fmtShort(p.totalARS) : '-'}</td>
+                                        <td style="text-align:right;padding:8px 4px;color:${p.totalUSD > 0 ? 'var(--red)' : 'var(--text-muted)'};font-family:'Space Mono',monospace">${p.totalUSD > 0 ? fmt(p.totalUSD, 'USD') : '-'}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                ${cuotasPendientes.length > 0 ? `
+                <div class="card"><div class="card-title">📊 Cuotas Pendientes</div>
+                    ${cuotasPendientes.map(g => {
+                        const pagadas = g.cuotas.filter(c => c.mesPago < getMonthKey(getArgentinaDate().getMonth(), getArgentinaDate().getFullYear())).length;
+                        const pct = Math.round((pagadas / g.totalCuotas) * 100);
+                        return `
+                        <div class="cuotas-item">
+                            <div class="cuotas-header">
+                                <span class="cuotas-name">${g.nombre}</span>
+                                <span class="cuotas-total">${g.currency === 'USD' ? fmt(g.montoTotal, 'USD') : fmtShort(g.montoTotal)}</span>
+                            </div>
+                            <div class="cuotas-progress"><div class="cuotas-bar" style="width:${pct}%"></div></div>
+                            <div class="cuotas-meta">
+                                <span>${pagadas}/${g.totalCuotas} pagadas</span>
+                                <span>${g.currency === 'USD' ? fmt(g.montoTotal / g.totalCuotas, 'USD') : fmtShort(g.montoTotal / g.totalCuotas)}/cuota</span>
+                            </div>
+                        </div>
+                    `;}).join('')}
+                </div>` : ''}
+                
+                <div class="card"><div class="card-title">Consumos a pagar en ${MONTHS[state.currentMonth]}</div><div class="tx-list">${tarjetaExpenses.length ? renderTransactionList(tarjetaExpenses) : '<div class="empty"><p>Sin consumos</p></div>'}</div></div>
+            </div>
+        `;
+    }
+    window.changeTarjetaMonth = d => { state.currentMonth += d; if (state.currentMonth > 11) { state.currentMonth = 0; state.currentYear++; } if (state.currentMonth < 0) { state.currentMonth = 11; state.currentYear--; } renderCurrentView(); };
+
+    // ============================================================
+    // PATRIMONIO
+    // ============================================================
+    function renderPatrimonio() {
+        const total = getTotalPatrimonio(), totalInv = getTotalInversiones();
+        const names = { bbva: 'BBVA', caja: 'Caja Seguridad', efectivo: 'Efectivo' };
+        return `
+            <div class="view active" id="patrimonioView">
+                <div class="pat-total"><div class="pat-total-label">Patrimonio Total USD</div><div class="pat-total-value">${fmt(total, 'USD')}</div></div>
+                <div class="pat-grid">
+                    ${['bbva', 'caja', 'efectivo'].map(acc => `
+                        <div class="pat-card" data-account="${acc}"><div class="pat-label">${names[acc]}</div><div class="pat-value">${fmt(state.patrimonio[acc], 'USD')}</div>
+                            <div class="pat-detail"><div class="action-btns">
+                                <button class="action-btn move" onclick="event.stopPropagation();showTransferModal('${acc}')">↔️ Mover</button>
+                                <button class="action-btn withdraw" onclick="event.stopPropagation();showWithdrawModal('${acc}')">📤 Retirar</button>
+                                <button class="action-btn deposit" onclick="event.stopPropagation();showDepositModal('${acc}')">📥 Ingresar</button>
+                            </div></div>
+                        </div>
+                    `).join('')}
+                    <div class="pat-card" data-account="inversiones"><div class="pat-label">Inversiones</div><div class="pat-value">${fmt(totalInv, 'USD')}</div>
+                        <div class="pat-detail">
+                            <div class="inv-list">${state.inversiones.length ? state.inversiones.map(inv => `
+                                <div class="inv-item" data-inv-id="${inv.id}"><div class="inv-header"><span class="inv-name">${inv.nombre}</span><span class="inv-amount">${fmt(inv.monto, 'USD')}</span></div>
+                                    <div class="inv-details">
+                                        <div class="inv-detail-row"><span>Tasa</span><span>${inv.tasa}%</span></div>
+                                        <div class="inv-detail-row"><span>Compra</span><span>${fmtShortDate(inv.fechaCompra)}</span></div>
+                                        <div class="inv-detail-row"><span>Vence</span><span>${fmtShortDate(inv.vencimiento)}</span></div>
+                                        <div class="inv-actions"><button class="inv-action-btn edit" onclick="event.stopPropagation();showEditInversionModal(${inv.id})">✏️</button><button class="inv-action-btn delete" onclick="event.stopPropagation();deleteInversion(${inv.id})">🗑️</button></div>
+                                    </div>
+                                </div>
+                            `).join('') : '<div class="empty"><p>Sin inversiones</p></div>'}</div>
+                            <button class="add-btn" style="margin-top:10px" onclick="event.stopPropagation();showAddInversionModal()">+ Agregar</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card"><div class="card-title">Movimientos USD</div><div class="mov-list">${state.movimientos.length ? state.movimientos.slice(0, 15).map(m => `<div class="mov-item"><span class="mov-date">${fmtShortDate(m.fecha)}</span><span class="mov-desc">${m.origen} → ${m.destino}${m.esAhorro ? '<span class="mov-badge">💰</span>' : ''}</span><span class="mov-amount" style="color:${m.destino === 'GASTO' ? 'var(--red)' : 'var(--blue)'}">${m.destino === 'GASTO' ? '-' : ''}${fmt(m.monto, 'USD')}</span></div>`).join('') : '<div class="empty"><p>Sin movimientos</p></div>'}</div></div>
+            </div>
+        `;
+    }
+
+    function initPatrimonioEvents() {
+        document.querySelectorAll('.pat-card').forEach(card => card.addEventListener('click', e => { if (e.target.tagName !== 'BUTTON') card.classList.toggle('expanded'); }));
+        document.querySelectorAll('.inv-item').forEach(item => item.addEventListener('click', e => { if (e.target.tagName !== 'BUTTON') item.classList.toggle('expanded'); }));
+    }
+
+    // ============================================================
+    // ANUAL
+    // ============================================================
+    function renderAnual() {
+        const yearExpenses = getYearExpenses(state.currentYear);
+        const totalGastosARS = yearExpenses.filter(e => e.currency === 'ARS').reduce((s, e) => s + e.amount, 0);
+        const totalIngresosARS = Object.entries(state.monthlyIncome).filter(([k]) => k.startsWith(state.currentYear.toString())).reduce((s, [, v]) => s + v, 0);
+        const gastosUSD = yearExpenses.filter(e => e.currency === 'USD').reduce((s, e) => s + e.amount, 0);
+        return `
+            <div class="view active">
+                <div class="month-sel" style="justify-content:center;margin-bottom:20px"><button class="month-btn" onclick="changeYear(-1)">‹</button><span class="month-display">${state.currentYear}</span><button class="month-btn" onclick="changeYear(1)">›</button></div>
+                <div class="annual-grid">
+                    <div class="annual-card"><div class="annual-label">Ingresos</div><div class="annual-value" style="color:var(--green)">${fmtShort(totalIngresosARS)}</div></div>
+                    <div class="annual-card"><div class="annual-label">Gastos ARS</div><div class="annual-value" style="color:var(--red)">${fmtShort(totalGastosARS)}</div></div>
+                    <div class="annual-card"><div class="annual-label">Ahorro ARS</div><div class="annual-value" style="color:var(--cyan)">${fmtShort(totalIngresosARS - totalGastosARS)}</div></div>
+                    <div class="annual-card"><div class="annual-label">Gastos USD</div><div class="annual-value" style="color:var(--yellow)">${fmt(gastosUSD, 'USD')}</div></div>
+                </div>
+                <div class="card"><div class="card-title">💰 Dólares Netos</div>
+                    <div style="text-align:center;padding:20px 0">
+                        <div style="font-family:'Space Mono';font-size:28px;font-weight:700;color:${state.dolaresAhorro - gastosUSD >= 0 ? 'var(--green)' : 'var(--red)'}">${fmt(state.dolaresAhorro - gastosUSD, 'USD')}</div>
+                        <div style="margin-top:12px;display:flex;justify-content:center;gap:24px;font-size:13px">
+                            <div><span style="color:var(--text-muted)">Ahorro:</span> <span style="color:var(--green)">${fmt(state.dolaresAhorro, 'USD')}</span></div>
+                            <div><span style="color:var(--text-muted)">Gastados:</span> <span style="color:var(--red)">${fmt(gastosUSD, 'USD')}</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card"><div class="card-title">Evolución ${state.currentYear}</div><div class="chart-box" style="height:250px"><canvas id="anualChart"></canvas></div></div>
+            </div>
+        `;
+    }
+
+    function initAnualEvents() { renderAnualChart(); }
+
+    function renderAnualChart() {
+        const ctx = document.getElementById('anualChart')?.getContext('2d');
+        if (!ctx) return;
+        const gastosData = [], ingresosData = [];
+        for (let i = 0; i < 12; i++) { gastosData.push(getMonthExpenses(i, state.currentYear).filter(e => e.currency === 'ARS').reduce((s, e) => s + e.amount, 0)); ingresosData.push(getMonthIncome(i, state.currentYear)); }
+        if (window.anualChartInstance) window.anualChartInstance.destroy();
+        window.anualChartInstance = new Chart(ctx, { type: 'bar', data: { labels: MONTHS.map(m => m.substring(0, 3)), datasets: [{ label: 'Ingresos', data: ingresosData, backgroundColor: '#22c55e', borderRadius: 4 }, { label: 'Gastos', data: gastosData, backgroundColor: '#ef4444', borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#a3a3a3' } } }, scales: { x: { grid: { display: false }, ticks: { color: '#737373' } }, y: { grid: { color: '#262626' }, ticks: { color: '#737373', callback: v => '$' + (v/1000000).toFixed(1) + 'M' } } } } });
+    }
+    window.changeYear = d => { state.currentYear += d; renderCurrentView(); };
+
+    // ============================================================
+    // MODALS
+    // ============================================================
+    const showModal = c => { document.getElementById('modalContent').innerHTML = c; document.getElementById('modalOverlay').classList.add('active'); };
+    window.hideModal = () => document.getElementById('modalOverlay').classList.remove('active');
+    document.getElementById('modalOverlay')?.addEventListener('click', e => { if (e.target.id === 'modalOverlay') hideModal(); });
+
+    // NUEVO GASTO
+    window.showNuevoGastoModal = function() {
+        const today = getArgentinaDateString();
+        showModal(`
+            <div class="modal-header"><span class="modal-title">➕ Nuevo Gasto</span><button class="modal-close" onclick="hideModal()">×</button></div>
+            <div class="modal-body">
+                <div class="form-group"><label class="form-label">Monto Total</label><div class="amount-wrap"><span class="amount-prefix">$</span><input type="number" class="form-input amount-input" id="newAmount" placeholder="0" step="0.01" inputmode="decimal"></div></div>
+                <div class="form-group"><label class="form-label">Fecha</label><input type="date" class="form-input" id="newDate" value="${today}"></div>
+                <div class="form-group"><label class="form-label">Categoría</label><div class="cat-grid">${Object.entries(CATS).map(([name, { icon }], i) => `<label class="cat-pill${i === 0 ? ' active' : ''}"><input type="radio" name="newCat" value="${name}" ${i === 0 ? 'checked' : ''}><span class="cat-pill-icon">${icon}</span><span class="cat-pill-name">${name}</span></label>`).join('')}</div></div>
+                <div class="form-row three">
+                    <div class="form-group"><label class="form-label">Moneda</label><select class="form-select" id="newCurrency"><option value="ARS">ARS</option><option value="USD">USD</option></select></div>
+                    <div class="form-group"><label class="form-label">Medio</label><select class="form-select" id="newPayment" onchange="updateCuotasVisibility()">${PAYMENTS.map(p => `<option value="${p}">${p}</option>`).join('')}</select></div>
+                    <div class="form-group" id="cuotasGroup" style="display:none"><label class="form-label">Cuotas</label><select class="form-select" id="newCuotas" onchange="updateCuotasHint()">${[1,2,3,4,5,6,9,12,18,24].map(n => `<option value="${n}">${n}</option>`).join('')}</select></div>
+                </div>
+                <div class="form-hint purple" id="cuotasHint" style="margin-bottom:14px"></div>
+                <div class="form-group"><label class="form-label">Descripción</label><input type="text" class="form-input" id="newDesc" placeholder="¿En qué gastaste?"></div>
+            </div>
+            <div class="modal-footer"><button class="btn btn-secondary" onclick="hideModal()">Cancelar</button><button class="btn btn-primary" onclick="saveNewExpense()">Guardar</button></div>
+        `);
+        document.querySelectorAll('#modalContent .cat-pill').forEach(pill => pill.addEventListener('click', () => { document.querySelectorAll('#modalContent .cat-pill').forEach(p => p.classList.remove('active')); pill.classList.add('active'); }));
+        document.getElementById('newDate').addEventListener('change', updateCuotasHint);
+        updateCuotasVisibility();
+    }
+
+    window.updateCuotasVisibility = function() {
+        const payment = document.getElementById('newPayment')?.value || '';
+        const isTarjeta = payment.includes('VISA') || payment.includes('MASTER');
+        document.getElementById('cuotasGroup').style.display = isTarjeta ? 'block' : 'none';
+        updateCuotasHint();
+    }
+
+    window.updateCuotasHint = function() {
+        const payment = document.getElementById('newPayment')?.value || '';
+        const cuotas = parseInt(document.getElementById('newCuotas')?.value) || 1;
+        const date = document.getElementById('newDate')?.value || '';
+        const amount = parseFloat(document.getElementById('newAmount')?.value) || 0;
+        const hint = document.getElementById('cuotasHint');
+        if (!hint) return;
+        const isTarjeta = payment.includes('VISA') || payment.includes('MASTER');
+        if (!isTarjeta) { hint.textContent = ''; return; }
+        const meses = getMesesPago(date, cuotas);
+        const montoCuota = amount > 0 ? Math.round((amount / cuotas) * 100) / 100 : 0;
+        if (cuotas === 1) {
+            hint.textContent = `💳 Pago en ${MONTHS[parseInt(meses[0].split('-')[1]) - 1]}`;
+        } else {
+            const primerMes = MONTHS[parseInt(meses[0].split('-')[1]) - 1].substring(0, 3);
+            const ultimoMes = MONTHS[parseInt(meses[meses.length - 1].split('-')[1]) - 1].substring(0, 3);
+            hint.textContent = `💳 ${cuotas} cuotas: ${primerMes} a ${ultimoMes}${montoCuota > 0 ? ` (${fmtShort(montoCuota)}/mes)` : ''}`;
+        }
+    }
+
+    window.saveNewExpense = async function() {
+        const amount = parseFloat(document.getElementById('newAmount').value);
+        if (!amount) { toast('Ingresá un monto', true); return; }
+        
+        const date = document.getElementById('newDate').value;
+        const payment = document.getElementById('newPayment').value;
+        const cuotas = parseInt(document.getElementById('newCuotas')?.value) || 1;
+        const isTarjeta = payment.includes('VISA') || payment.includes('MASTER');
+        
+        const expense = {
+            date,
+            amount,
+            category: document.querySelector('input[name="newCat"]:checked').value,
+            currency: document.getElementById('newCurrency').value,
+            payment,
+            description: document.getElementById('newDesc').value.trim()
+        };
+        
+        // Para gastos NO tarjeta, el mesPago es el mes de la fecha
+        const mesPagoNoTarjeta = `${date.split('-')[0]}-${date.split('-')[1]}`;
+        
+        let result;
+        if (isTarjeta && cuotas > 1) {
+            const mesesPago = getMesesPago(date, cuotas);
+            console.log('Guardando con cuotas:', { expense, cuotas, mesesPago });
+            result = await apiPost('addExpenseWithCuotas', { expense, cuotas, mesesPago });
+            console.log('Resultado cuotas:', result);
+            if (result?.success) {
+                const montoCuota = Math.round((amount / cuotas) * 100) / 100;
+                for (let i = 0; i < cuotas; i++) {
+                    state.expenses.unshift({
+                        id: result.ids[i],
+                        ...expense,
+                        amount: montoCuota,
+                        cuotaActual: i + 1,
+                        totalCuotas: cuotas,
+                        idGrupo: result.groupId,
+                        mesPago: mesesPago[i]
+                    });
+                }
+                saveLocalState();
+                hideModal();
+                renderCurrentView();
+                toast(`✓ ${cuotas} cuotas guardadas`);
+            } else {
+                toast(`Error: ${result?.error || 'Sin respuesta'}`, true);
+            }
+        } else {
+            const mesPago = isTarjeta ? getMesesPago(date, 1)[0] : mesPagoNoTarjeta;
+            console.log('Guardando gasto:', { ...expense, mesPago });
+            result = await apiPost('addExpense', { ...expense, mesPago });
+            console.log('Resultado:', result);
+            if (result?.success) {
+                state.expenses.unshift({ id: result.id, ...expense, cuotaActual: 1, totalCuotas: 1, mesPago });
+                saveLocalState();
+                hideModal();
+                renderCurrentView();
+                toast(`✓ Guardado (ID: ${result.id})`);
+            } else {
+                toast(`Error: ${result?.error || 'Sin respuesta'}`, true);
+            }
+        }
+    }
+
+    // EDIT EXPENSE
+    window.showEditExpenseModal = function(id) {
+        const e = state.expenses.find(x => x.id === id);
+        if (!e) return;
+        const isCuota = e.totalCuotas > 1;
+        showModal(`
+            <div class="modal-header"><span class="modal-title">Editar Gasto${isCuota ? ` (${e.cuotaActual}/${e.totalCuotas})` : ''}</span><button class="modal-close" onclick="hideModal()">×</button></div>
+            <div class="modal-body">
+                <div class="form-group"><label class="form-label">Fecha</label><input type="date" class="form-input" id="editDate" value="${fmtFullDate(e.date)}"></div>
+                <div class="form-group"><label class="form-label">Monto</label><div class="amount-wrap"><span class="amount-prefix">$</span><input type="number" class="form-input amount-input" id="editAmount" value="${e.amount}" step="0.01"></div></div>
+                <div class="form-group"><label class="form-label">Categoría</label><select class="form-select" id="editCategory">${Object.keys(CATS).map(c => `<option value="${c}" ${e.category === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div>
+                <div class="form-row"><div class="form-group"><label class="form-label">Moneda</label><select class="form-select" id="editCurrency"><option value="ARS" ${e.currency === 'ARS' ? 'selected' : ''}>ARS</option><option value="USD" ${e.currency === 'USD' ? 'selected' : ''}>USD</option></select></div><div class="form-group"><label class="form-label">Medio Pago</label><select class="form-select" id="editPayment">${PAYMENTS.map(p => `<option value="${p}" ${e.payment === p ? 'selected' : ''}>${p}</option>`).join('')}</select></div></div>
+                <div class="form-group"><label class="form-label">Descripción</label><input type="text" class="form-input" id="editDesc" value="${e.description || ''}"></div>
+            </div>
+            <div class="modal-footer"><button class="btn btn-danger" onclick="confirmDeleteExpense(${id})">Eliminar${isCuota ? ' Todas' : ''}</button><button class="btn btn-primary" onclick="saveExpenseEdit(${id})">Guardar</button></div>
+        `);
+    }
+    window.saveExpenseEdit = async id => {
+        const e = state.expenses.find(x => x.id === id);
+        const date = document.getElementById('editDate').value;
+        const payment = document.getElementById('editPayment').value;
+        const isTarjeta = payment.includes('VISA') || payment.includes('MASTER');
+        const mesPago = isTarjeta ? getMesesPago(date, 1)[0] : null;
+        
+        const data = { id, date, amount: parseFloat(document.getElementById('editAmount').value), category: document.getElementById('editCategory').value, currency: document.getElementById('editCurrency').value, payment, description: document.getElementById('editDesc').value, mesPago };
+        
+        const result = await apiPost('updateExpense', data);
+        if (result?.success) {
+            const idx = state.expenses.findIndex(e => e.id === id);
+            if (idx !== -1) state.expenses[idx] = { ...state.expenses[idx], ...data };
+            saveLocalState(); hideModal(); renderCurrentView(); toast('Actualizado');
+        }
+    };
+    window.confirmDeleteExpense = id => { deleteExpense(id); hideModal(); };
+
+    // INCOME
+    function showIncomeModal() {
+        // Abrir Google Form de ingresos
+        if (!CONFIG.FORM_INGRESOS_URL) {
+            toast('URL del formulario de ingresos no configurada', true);
+            return;
+        }
+        window.open(CONFIG.FORM_INGRESOS_URL, '_blank');
+        setTimeout(() => {
+            toast('📝 Después de guardar, clickeá "Sincronizar" para ver el ingreso');
+        }, 1000);
+    }
+    window.saveIncome = async () => {
+        // Ya no se usa - los ingresos se cargan via Form
+        toast('Usá el formulario de Google para cargar ingresos');
+    };
+
+    // PATRIMONIO MODALS
+    window.showTransferModal = from => {
+        const accounts = ['bbva', 'caja', 'efectivo'].filter(a => a !== from);
+        const names = { bbva: 'BBVA', caja: 'Caja Seguridad', efectivo: 'Efectivo' };
+        showModal(`<div class="modal-header"><span class="modal-title">Mover desde ${names[from]}</span><button class="modal-close" onclick="hideModal()">×</button></div><div class="modal-body"><div class="form-group"><label class="form-label">Hacia</label><select class="form-select" id="transferTo">${accounts.map(a => `<option value="${a}">${names[a]}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">Monto USD</label><div class="amount-wrap"><span class="amount-prefix">$</span><input type="number" class="form-input amount-input" id="transferAmount" step="0.01"></div></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="hideModal()">Cancelar</button><button class="btn btn-primary" onclick="executeTransfer('${from}')">Transferir</button></div>`);
+    };
+    window.executeTransfer = async from => {
+        const to = document.getElementById('transferTo').value, amount = parseFloat(document.getElementById('transferAmount').value);
+        if (!amount || amount <= 0) { toast('Monto inválido', true); return; }
+        if (state.patrimonio[from] < amount) { toast('Saldo insuficiente', true); return; }
+        const names = { bbva: 'BBVA', caja: 'Caja Seguridad', efectivo: 'Efectivo' };
+        state.patrimonio[from] -= amount; state.patrimonio[to] += amount;
+        const mov = { fecha: getArgentinaDateString(), origen: names[from], destino: names[to], monto: amount, esAhorro: false };
+        await apiPost('updatePatrimonio', state.patrimonio);
+        await apiPost('addMovimiento', mov);
+        state.movimientos.unshift({ id: Date.now(), ...mov });
+        saveLocalState(); hideModal(); renderCurrentView(); toast('Transferido');
+    };
+
+    window.showWithdrawModal = from => {
+        const names = { bbva: 'BBVA', caja: 'Caja Seguridad', efectivo: 'Efectivo' };
+        showModal(`<div class="modal-header"><span class="modal-title">Retirar de ${names[from]}</span><button class="modal-close" onclick="hideModal()">×</button></div><div class="modal-body"><div class="form-group"><label class="form-label">Monto USD</label><div class="amount-wrap"><span class="amount-prefix">$</span><input type="number" class="form-input amount-input" id="withdrawAmount" step="0.01"></div></div><div class="form-group"><label class="form-label">Motivo</label><input type="text" class="form-input" id="withdrawNote" placeholder="Ej: Gasto viaje"></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="hideModal()">Cancelar</button><button class="btn btn-danger" onclick="executeWithdraw('${from}')">Retirar</button></div>`);
+    };
+    window.executeWithdraw = async from => {
+        const amount = parseFloat(document.getElementById('withdrawAmount').value), note = document.getElementById('withdrawNote').value || 'Retiro';
+        if (!amount || amount <= 0) { toast('Monto inválido', true); return; }
+        if (state.patrimonio[from] < amount) { toast('Saldo insuficiente', true); return; }
+        const names = { bbva: 'BBVA', caja: 'Caja Seguridad', efectivo: 'Efectivo' };
+        state.patrimonio[from] -= amount;
+        const mov = { fecha: getArgentinaDateString(), origen: names[from], destino: 'GASTO', monto: amount, nota: note, esAhorro: false };
+        await apiPost('updatePatrimonio', state.patrimonio);
+        await apiPost('addMovimiento', mov);
+        state.movimientos.unshift({ id: Date.now(), ...mov });
+        saveLocalState(); hideModal(); renderCurrentView(); toast('Retiro registrado');
+    };
+
+    window.showDepositModal = to => {
+        const names = { bbva: 'BBVA', caja: 'Caja Seguridad', efectivo: 'Efectivo' };
+        showModal(`<div class="modal-header"><span class="modal-title">Ingresar a ${names[to]}</span><button class="modal-close" onclick="hideModal()">×</button></div><div class="modal-body"><div class="form-group"><label class="form-label">Monto USD</label><div class="amount-wrap"><span class="amount-prefix">$</span><input type="number" class="form-input amount-input" id="depositAmount" step="0.01"></div></div><div class="form-group"><label class="form-label">Motivo</label><input type="text" class="form-input" id="depositNote" placeholder="Ej: Compra dólares"></div><div class="form-group"><div class="toggle-group" id="ahorroToggle" onclick="toggleAhorro()"><span class="toggle-emoji">💰</span><span class="toggle-label">Es Ahorro</span><div class="toggle-switch" id="ahorroSwitch"></div></div></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="hideModal()">Cancelar</button><button class="btn btn-primary" onclick="executeDeposit('${to}')">Ingresar</button></div>`);
+    };
+    window.toggleAhorro = () => { document.getElementById('ahorroToggle').classList.toggle('active'); document.getElementById('ahorroSwitch').classList.toggle('active'); };
+    window.executeDeposit = async to => {
+        const amount = parseFloat(document.getElementById('depositAmount').value), note = document.getElementById('depositNote').value || 'Ingreso', esAhorro = document.getElementById('ahorroToggle').classList.contains('active');
+        if (!amount || amount <= 0) { toast('Monto inválido', true); return; }
+        const names = { bbva: 'BBVA', caja: 'Caja Seguridad', efectivo: 'Efectivo' };
+        state.patrimonio[to] += amount;
+        if (esAhorro) state.dolaresAhorro += amount;
+        const mov = { fecha: getArgentinaDateString(), origen: 'INGRESO', destino: names[to], monto: amount, nota: note, esAhorro };
+        await apiPost('updatePatrimonio', state.patrimonio);
+        await apiPost('addMovimiento', mov);
+        if (esAhorro) await apiPost('setDolaresAhorro', { amount: state.dolaresAhorro });
+        state.movimientos.unshift({ id: Date.now(), ...mov });
+        saveLocalState(); hideModal(); renderCurrentView(); toast(esAhorro ? 'Ahorro registrado 💰' : 'Ingreso registrado');
+    };
+
+    window.showAddInversionModal = () => {
+        showModal(`<div class="modal-header"><span class="modal-title">Nueva Inversión</span><button class="modal-close" onclick="hideModal()">×</button></div><div class="modal-body"><div class="form-group"><label class="form-label">Nombre</label><input type="text" class="form-input" id="invNombre" placeholder="Ej: CRESUD"></div><div class="form-group"><label class="form-label">Origen</label><select class="form-select" id="invOrigen"><option value="bbva">BBVA</option><option value="caja">Caja</option><option value="efectivo">Efectivo</option><option value="externo">Externo</option></select></div><div class="form-group"><label class="form-label">Monto USD</label><div class="amount-wrap"><span class="amount-prefix">$</span><input type="number" class="form-input amount-input" id="invMonto" step="0.01"></div></div><div class="form-row"><div class="form-group"><label class="form-label">Tasa %</label><input type="number" class="form-input" id="invTasa" step="0.1"></div><div class="form-group"><label class="form-label">Frecuencia</label><select class="form-select" id="invFrecuencia"><option>Trimestral</option><option>Semestral</option><option>Anual</option></select></div></div><div class="form-row"><div class="form-group"><label class="form-label">Compra</label><input type="date" class="form-input" id="invFechaCompra" value="${getArgentinaDateString()}"></div><div class="form-group"><label class="form-label">Vencimiento</label><input type="date" class="form-input" id="invVencimiento"></div></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="hideModal()">Cancelar</button><button class="btn btn-primary" onclick="saveNewInversion()">Guardar</button></div>`);
+    };
+    window.saveNewInversion = async () => {
+        const origen = document.getElementById('invOrigen').value, monto = parseFloat(document.getElementById('invMonto').value), nombre = document.getElementById('invNombre').value;
+        if (!nombre || !monto) { toast('Completar datos', true); return; }
+        if (origen !== 'externo' && state.patrimonio[origen] < monto) { toast('Saldo insuficiente', true); return; }
+        const names = { bbva: 'BBVA', caja: 'Caja Seguridad', efectivo: 'Efectivo' };
+        const inv = { nombre, monto, tasa: parseFloat(document.getElementById('invTasa').value) || 0, frecuencia: document.getElementById('invFrecuencia').value, fechaCompra: document.getElementById('invFechaCompra').value, vencimiento: document.getElementById('invVencimiento').value, origen: origen !== 'externo' ? names[origen] : 'Externo' };
+        if (origen !== 'externo') {
+            state.patrimonio[origen] -= monto;
+            await apiPost('updatePatrimonio', state.patrimonio);
+            await apiPost('addMovimiento', { fecha: inv.fechaCompra, origen: names[origen], destino: nombre, monto, esAhorro: false });
+        }
+        const result = await apiPost('addInversion', inv);
+        if (result?.success) { inv.id = result.id; state.inversiones.push(inv); saveLocalState(); hideModal(); renderCurrentView(); toast('Inversión agregada'); }
+    };
+
+    window.showEditInversionModal = id => {
+        const inv = state.inversiones.find(i => i.id === id);
+        if (!inv) return;
+        showModal(`<div class="modal-header"><span class="modal-title">Editar Inversión</span><button class="modal-close" onclick="hideModal()">×</button></div><div class="modal-body"><div class="form-group"><label class="form-label">Nombre</label><input type="text" class="form-input" id="editInvNombre" value="${inv.nombre}"></div><div class="form-group"><label class="form-label">Monto</label><div class="amount-wrap"><span class="amount-prefix">$</span><input type="number" class="form-input amount-input" id="editInvMonto" value="${inv.monto}" step="0.01"></div></div><div class="form-row"><div class="form-group"><label class="form-label">Tasa %</label><input type="number" class="form-input" id="editInvTasa" value="${inv.tasa}" step="0.1"></div><div class="form-group"><label class="form-label">Frecuencia</label><select class="form-select" id="editInvFrecuencia"><option ${inv.frecuencia === 'Trimestral' ? 'selected' : ''}>Trimestral</option><option ${inv.frecuencia === 'Semestral' ? 'selected' : ''}>Semestral</option><option ${inv.frecuencia === 'Anual' ? 'selected' : ''}>Anual</option></select></div></div><div class="form-row"><div class="form-group"><label class="form-label">Compra</label><input type="date" class="form-input" id="editInvFechaCompra" value="${inv.fechaCompra}"></div><div class="form-group"><label class="form-label">Vence</label><input type="date" class="form-input" id="editInvVencimiento" value="${inv.vencimiento}"></div></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="hideModal()">Cancelar</button><button class="btn btn-primary" onclick="saveInversionEdit(${id})">Guardar</button></div>`);
+    };
+    window.saveInversionEdit = async id => {
+        const data = { id, nombre: document.getElementById('editInvNombre').value, monto: parseFloat(document.getElementById('editInvMonto').value), tasa: parseFloat(document.getElementById('editInvTasa').value), frecuencia: document.getElementById('editInvFrecuencia').value, fechaCompra: document.getElementById('editInvFechaCompra').value, vencimiento: document.getElementById('editInvVencimiento').value };
+        await apiPost('updateInversion', data);
+        const idx = state.inversiones.findIndex(i => i.id === id);
+        if (idx !== -1) state.inversiones[idx] = { ...state.inversiones[idx], ...data };
+        saveLocalState(); hideModal(); renderCurrentView(); toast('Actualizado');
+    };
+    window.deleteInversion = async id => {
+        if (!confirm('¿Eliminar inversión?')) return;
+        await apiPost('deleteInversion', { id });
+        state.inversiones = state.inversiones.filter(i => i.id !== id);
+        saveLocalState(); renderCurrentView(); toast('Eliminada');
+    };
+
+    // ============================================================
+    // INIT
+    // ============================================================
+    document.addEventListener('DOMContentLoaded', () => {
+        initialLoad();
+        document.querySelectorAll('.nav-btn, .bnav-item').forEach(btn => btn.addEventListener('click', () => switchView(btn.dataset.view)));
+        setInterval(fetchCotizaciones, 5 * 60 * 1000);
+    });
+
+    // ============================================================
+    // AGREGAR GASTO VIA GOOGLE FORM
+    // ============================================================
+    window.openGoogleForm = function() {
+        if (!CONFIG.FORM_URL) {
+            toast('URL del formulario no configurada', true);
+            return;
+        }
+        // Abrir Google Form en nueva pestaña
+        window.open(CONFIG.FORM_URL, '_blank');
+        // Mostrar mensaje recordatorio
+        setTimeout(() => {
+            toast('📝 Después de guardar, clickeá "Sincronizar" para ver el gasto');
+        }, 1000);
+    }
+
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+    
+    // Diagnóstico
+    window.runDiagnostic = async function() {
+        const log = [];
+        log.push('🔧 Iniciando diagnóstico...');
+        log.push('URL: ' + (CONFIG.SCRIPT_URL ? CONFIG.SCRIPT_URL.substring(0, 50) + '...' : 'NO CONFIGURADA'));
+        
+        if (!CONFIG.SCRIPT_URL) {
+            alert('❌ SCRIPT_URL no está configurada!\n\nAbrí index.html y buscá:\nSCRIPT_URL: \'\'\n\nPegá tu URL de Google Apps Script ahí.');
+            return;
+        }
+        
+        // Test 1: Conexión
+        log.push('\n📡 Test 1: Conexión...');
+        try {
+            const testRes = await fetch(CONFIG.SCRIPT_URL + '?action=test');
+            const testData = await testRes.json();
+            log.push('✅ Conexión OK: ' + testData.message);
+        } catch (e) {
+            log.push('❌ Error conexión: ' + e.message);
+            alert(log.join('\n'));
+            return;
+        }
+        
+        // Test 2: Lectura
+        log.push('\n📖 Test 2: Lectura datos...');
+        try {
+            const readRes = await fetch(CONFIG.SCRIPT_URL + '?action=getAll');
+            const readData = await readRes.json();
+            log.push('✅ Lectura OK');
+            log.push('   - Gastos: ' + (readData.expenses?.length || 0));
+            log.push('   - Inversiones: ' + (readData.inversiones?.length || 0));
+        } catch (e) {
+            log.push('❌ Error lectura: ' + e.message);
+        }
+        
+        // Test 3: Escritura
+        log.push('\n✏️ Test 3: Escritura...');
+        const testExpense = {
+            date: getArgentinaDateString(),
+            amount: 1,
+            category: 'Otros',
+            currency: 'ARS',
+            payment: 'Efectivo',
+            description: 'TEST_DIAGNOSTICO_BORRAR',
+            mesPago: getMonthKey(getArgentinaDate().getMonth(), getArgentinaDate().getFullYear())
+        };
+        
+        try {
+            const writeUrl = `${CONFIG.SCRIPT_URL}?action=addExpense&data=${encodeURIComponent(JSON.stringify(testExpense))}`;
+            log.push('   URL length: ' + writeUrl.length);
+            const writeRes = await fetch(writeUrl);
+            const writeData = await writeRes.json();
+            log.push('   Respuesta: ' + JSON.stringify(writeData));
+            
+            if (writeData.success) {
+                log.push('✅ Escritura OK! ID: ' + writeData.id);
+                log.push('\n🎉 TODO FUNCIONA CORRECTAMENTE');
+                log.push('\n⚠️ Se creó un gasto de prueba de $1');
+                log.push('   Podés borrarlo desde el historial.');
+                
+                // Recargar datos
+                await syncFromSheet();
+            } else {
+                log.push('❌ Error escritura: ' + writeData.error);
+            }
+        } catch (e) {
+            log.push('❌ Error escritura: ' + e.message);
+        }
+        
+        console.log(log.join('\n'));
+        alert(log.join('\n'));
+    }
+    
+    // Migrar gastos existentes (calcular mesPago para los que no tienen)
+    window.migrarGastos = async function() {
+        if (!confirm('¿Migrar gastos existentes para calcular el mes de pago correcto?')) return;
+        
+        let migrados = 0;
+        for (const expense of state.expenses) {
+            if (!expense.mesPago && expense.date) {
+                const isTarjeta = expense.payment?.includes('VISA') || expense.payment?.includes('MASTER');
+                let mesPago;
+                
+                if (isTarjeta) {
+                    const mp = calcularMesPago(expense.date);
+                    mesPago = getMonthKey(mp.month, mp.year);
+                } else {
+                    const d = new Date(expense.date + 'T12:00:00');
+                    mesPago = getMonthKey(d.getMonth(), d.getFullYear());
+                }
+                
+                expense.mesPago = mesPago;
+                await apiPost('updateExpense', expense);
+                migrados++;
+            }
+        }
+        
+        saveLocalState();
+        toast(`Migrados ${migrados} gastos`);
+        renderCurrentView();
+    }
+    </script>
+</body>
+</html>
