@@ -24,7 +24,7 @@ const SHEETS = {
     PATRIMONIO: 'Patrimonio',          // Hoja legacy (backup)
     INVERSIONES: 'Inversiones',
     MOVIMIENTOS: 'Movimientos',
-    INGRESOS: 'Ingresos Mensuales',
+    INGRESOS: 'Formulario Ingresos',   // Hoja del Google Form de ingresos
     CONFIG: 'Config'
 };
 
@@ -467,15 +467,39 @@ function getIngresos() {
         const data = sheet.getDataRange().getValues();
         const ingresos = {};
         
+        // Detectar formato de columnas basado en headers
+        // Formato Google Form: Marca temporal | Cobro | Mes | Año
+        // Formato manual: Mes | Año | Monto
+        
+        const headers = data[0] || [];
+        const isFormFormat = String(headers[0] || '').toLowerCase().includes('marca') || 
+                            String(headers[0] || '').toLowerCase().includes('timestamp');
+        
         for (let i = 1; i < data.length; i++) {
-            if (data[i][0] && data[i][1]) {
-                const key = `${data[i][1]}-${String(data[i][0]).padStart(2, '0')}`;
-                ingresos[key] = parseFloat(data[i][2]) || 0;
+            let mes, year, monto;
+            
+            if (isFormFormat) {
+                // Formato del Google Form: A=Timestamp, B=Cobro, C=Mes, D=Año
+                monto = parseFloat(data[i][1]) || 0;
+                mes = parseInt(data[i][2]) || 0;
+                year = parseInt(data[i][3]) || 0;
+            } else {
+                // Formato manual/legacy: A=Mes, B=Año, C=Monto
+                mes = parseInt(data[i][0]) || 0;
+                year = parseInt(data[i][1]) || 0;
+                monto = parseFloat(data[i][2]) || 0;
+            }
+            
+            if (mes && year && monto) {
+                const key = `${year}-${String(mes).padStart(2, '0')}`;
+                // Sumar si ya existe (múltiples ingresos en el mismo mes)
+                ingresos[key] = (ingresos[key] || 0) + monto;
             }
         }
         
         return { success: true, data: ingresos };
     } catch (error) {
+        console.error('Error en getIngresos:', error);
         return { success: true, data: {} };
     }
 }
@@ -847,12 +871,39 @@ function setDolaresAhorro(amount) {
 // ============================================================
 function formatDateForExport(value) {
     if (!value) return '';
+    
+    // Si es un objeto Date de JavaScript/Google Apps Script
     if (value instanceof Date) {
+        if (isNaN(value.getTime())) return ''; // Invalid date
         return Utilities.formatDate(value, 'America/Argentina/Buenos_Aires', 'yyyy-MM-dd');
     }
-    const str = String(value);
-    if (str.includes('T')) return str.split('T')[0];
-    if (str.includes(' ')) return str.split(' ')[0];
+    
+    const str = String(value).trim();
+    
+    // Si ya está en formato yyyy-MM-dd, retornar
+    if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+        return str.split('T')[0].split(' ')[0];
+    }
+    
+    // Si está en formato d/m/yyyy o dd/mm/yyyy (formato argentino)
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}/.test(str)) {
+        const parts = str.split('/');
+        const day = parts[0].padStart(2, '0');
+        const month = parts[1].padStart(2, '0');
+        const year = parts[2].split(' ')[0]; // Quitar cualquier hora
+        return `${year}-${month}-${day}`;
+    }
+    
+    // Si contiene T (formato ISO), extraer la fecha
+    if (str.includes('T')) {
+        return str.split('T')[0];
+    }
+    
+    // Si contiene espacio (fecha con hora), extraer la fecha
+    if (str.includes(' ')) {
+        return str.split(' ')[0];
+    }
+    
     return str;
 }
 
@@ -914,13 +965,30 @@ function calcularMesPagoConCuota(fechaStr, medioPago, cuotaActual) {
     if (!fechaStr) return '';
     
     try {
-        const fecha = new Date(fechaStr + 'T12:00:00');
+        // Asegurar formato yyyy-MM-dd
+        let fechaNormalizada = fechaStr;
+        if (/^\d{1,2}\/\d{1,2}\/\d{4}/.test(fechaStr)) {
+            const parts = fechaStr.split('/');
+            fechaNormalizada = `${parts[2].split(' ')[0]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        }
+        
+        const fecha = new Date(fechaNormalizada + 'T12:00:00');
+        if (isNaN(fecha.getTime())) {
+            console.error('Fecha inválida en calcularMesPagoConCuota:', fechaStr);
+            return '';
+        }
+        
         const year = fecha.getFullYear();
         const month = fecha.getMonth();
         
-        const isTarjeta = medioPago && (medioPago.includes('VISA') || medioPago.includes('MASTER') || medioPago.toLowerCase().includes('tarjeta'));
+        const isTarjeta = medioPago && (
+            medioPago.toUpperCase().includes('VISA') || 
+            medioPago.toUpperCase().includes('MASTER') || 
+            medioPago.toLowerCase().includes('tarjeta')
+        );
         
         if (isTarjeta) {
+            // Calcular último jueves del mes (cierre de tarjeta)
             const lastDay = new Date(year, month + 1, 0);
             const dayOfWeek = lastDay.getDay();
             const diff = (dayOfWeek >= 4) ? (dayOfWeek - 4) : (dayOfWeek + 3);
@@ -928,13 +996,16 @@ function calcularMesPagoConCuota(fechaStr, medioPago, cuotaActual) {
             
             let baseMonth, baseYear;
             if (fecha <= lastThursday) {
+                // Compra antes del cierre: pago mes siguiente
                 baseMonth = month + 1;
                 baseYear = year;
             } else {
+                // Compra después del cierre: pago en 2 meses
                 baseMonth = month + 2;
                 baseYear = year;
             }
             
+            // Ajustar por número de cuota
             const cuotaOffset = (cuotaActual || 1) - 1;
             let finalMonth = baseMonth + cuotaOffset;
             let finalYear = baseYear;
@@ -946,9 +1017,11 @@ function calcularMesPagoConCuota(fechaStr, medioPago, cuotaActual) {
             
             return `${finalYear}-${String(finalMonth + 1).padStart(2, '0')}`;
         } else {
+            // No es tarjeta: el gasto corresponde al mes de la fecha
             return `${year}-${String(month + 1).padStart(2, '0')}`;
         }
     } catch (e) {
+        console.error('Error en calcularMesPagoConCuota:', e, 'fecha:', fechaStr);
         return '';
     }
 }
