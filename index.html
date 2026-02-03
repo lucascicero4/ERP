@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -1422,6 +1422,80 @@
         alert(log.join('\n'));
     }
     
+    // NUEVO: Diagnóstico detallado de cuotas y proyección
+    window.debugCuotas = function() {
+        console.log('=== DIAGNÓSTICO CUOTAS Y PROYECCIÓN ===');
+        console.log('Total gastos en state:', state.expenses.length);
+        
+        // 1. Mostrar TODOS los gastos con cuotas
+        const gastosConCuotas = state.expenses.filter(e => e.totalCuotas > 1);
+        console.log('\n📊 GASTOS CON CUOTAS (' + gastosConCuotas.length + '):');
+        gastosConCuotas.forEach(e => {
+            console.log(`  [${e.id}] ${e.description}`);
+            console.log(`      cuota: ${e.cuotaActual}/${e.totalCuotas}`);
+            console.log(`      mesPago: "${e.mesPago}" (tipo: ${typeof e.mesPago})`);
+            console.log(`      payment: "${e.payment}"`);
+            console.log(`      amount: ${e.amount} ${e.currency}`);
+            console.log(`      idGrupo: ${e.idGrupo}`);
+        });
+        
+        // 2. Verificar qué gastos tienen mesPago para cada mes
+        console.log('\n📅 GASTOS POR MES DE PAGO:');
+        const hoy = getArgentinaDate();
+        for (let i = 0; i < 8; i++) {
+            let m = hoy.getMonth() + i;
+            let y = hoy.getFullYear();
+            while (m > 11) { m -= 12; y++; }
+            const mesKey = getMonthKey(m, y);
+            
+            const gastosDelMes = state.expenses.filter(e => {
+                const mp = (e.mesPago || '').trim();
+                return mp === mesKey;
+            });
+            
+            const tarjeta = gastosDelMes.filter(e => 
+                e.payment?.includes('VISA') || e.payment?.includes('MASTER')
+            );
+            
+            const totalARS = tarjeta.filter(e => e.currency === 'ARS')
+                .reduce((s,e) => s + (parseFloat(e.amount)||0), 0);
+            const totalUSD = tarjeta.filter(e => e.currency === 'USD')
+                .reduce((s,e) => s + (parseFloat(e.amount)||0), 0);
+            
+            console.log(`\n  ${MONTHS[m]} (mesKey="${mesKey}"):`);
+            console.log(`    Total gastos: ${gastosDelMes.length}, Tarjeta: ${tarjeta.length}`);
+            console.log(`    Suma: ARS $${totalARS.toLocaleString()}, USD $${totalUSD.toLocaleString()}`);
+            
+            tarjeta.forEach(e => {
+                console.log(`      - ${e.description}: ${e.currency} ${e.amount}`);
+            });
+        }
+        
+        // 3. Buscar gastos sin mesPago
+        const sinMesPago = state.expenses.filter(e => !e.mesPago || e.mesPago.trim() === '');
+        console.log('\n⚠️ GASTOS SIN mesPago (' + sinMesPago.length + '):');
+        sinMesPago.slice(0, 10).forEach(e => {
+            console.log(`  - ${e.description} | ${e.payment} | fecha: ${e.date}`);
+        });
+        
+        console.log('\n=== FIN DIAGNÓSTICO ===');
+        console.log('Ejecutá showExpense("PRUEBA") para ver detalles de un gasto específico');
+        return 'Ver consola (F12) para detalles';
+    };
+    
+    // Mostrar un gasto específico por nombre
+    window.showExpense = function(searchTerm) {
+        const results = state.expenses.filter(e => 
+            (e.description || '').toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        console.log(`\nEncontrados ${results.length} gastos con "${searchTerm}":`);
+        results.forEach(e => {
+            console.log('---');
+            console.log(JSON.stringify(e, null, 2));
+        });
+        return results;
+    };
+    
     // Migrar gastos existentes (calcular mesPago para los que no tienen)
     window.migrarGastos = async function() {
         if (!confirm('¿Migrar gastos existentes para calcular el mes de pago correcto?')) return;
@@ -1449,6 +1523,81 @@
         saveLocalState();
         toast(`Migrados ${migrados} gastos`);
         renderCurrentView();
+    }
+    
+    // Debug de cuotas - ejecutar desde consola: debugCuotas()
+    window.debugCuotas = function() {
+        console.log('=== DEBUG CUOTAS ===');
+        
+        // 1. Filtrar gastos con cuotas
+        const conCuotas = state.expenses.filter(e => e.totalCuotas > 1);
+        console.log(`\n📋 Gastos con cuotas (${conCuotas.length}):`);
+        conCuotas.forEach(e => {
+            console.log(`  - ${e.description}`);
+            console.log(`    mesPago: "${e.mesPago}" (tipo: ${typeof e.mesPago})`);
+            console.log(`    cuota: ${e.cuotaActual}/${e.totalCuotas}`);
+            console.log(`    payment: ${e.payment}`);
+            console.log(`    amount: ${e.amount} ${e.currency}`);
+        });
+        
+        // 2. Ver qué meses únicos hay
+        const mesesUnicos = [...new Set(state.expenses.map(e => e.mesPago).filter(m => m))];
+        console.log('\n📅 Meses únicos en gastos:', mesesUnicos);
+        
+        // 3. Verificar proyección
+        const hoy = getArgentinaDate();
+        console.log('\n📊 Verificando proyección desde:', hoy.toISOString().slice(0, 10));
+        
+        for (let i = 0; i < 6; i++) {
+            let m = hoy.getMonth() + i;
+            let y = hoy.getFullYear();
+            while (m > 11) { m -= 12; y++; }
+            
+            const mesKey = getMonthKey(m, y);
+            console.log(`\n  Mes: ${mesKey} (${MONTHS[m]} ${y})`);
+            
+            // Filtrar gastos de tarjeta para este mes
+            const gastosMes = state.expenses.filter(e => {
+                const isTarjeta = e.payment?.includes('VISA') || e.payment?.includes('MASTER');
+                if (!isTarjeta) return false;
+                
+                const mesPagoNorm = (e.mesPago || '').trim();
+                if (mesPagoNorm) {
+                    const match = mesPagoNorm === mesKey;
+                    if (match && e.totalCuotas > 1) {
+                        console.log(`    ✓ MATCH: ${e.description} (${e.amount} ${e.currency})`);
+                    }
+                    return match;
+                }
+                
+                // Calcular dinámicamente
+                const mp = calcularMesPago(e.date);
+                return mp.month === m && mp.year === y;
+            });
+            
+            const totalARS = gastosMes.filter(e => e.currency === 'ARS').reduce((s, e) => s + e.amount, 0);
+            const totalUSD = gastosMes.filter(e => e.currency === 'USD').reduce((s, e) => s + e.amount, 0);
+            console.log(`    Gastos tarjeta: ${gastosMes.length}, ARS: $${totalARS.toLocaleString()}, USD: U$S${totalUSD}`);
+        }
+        
+        console.log('\n=== FIN DEBUG ===');
+        return 'Debug completado - ver consola';
+    }
+    
+    // Debug del API - ejecutar desde consola: debugAPI()
+    window.debugAPI = async function() {
+        console.log('=== DEBUG API ===');
+        try {
+            const url = `${CONFIG.SCRIPT_URL}?action=debug`;
+            console.log('Llamando a:', url);
+            const res = await fetch(url);
+            const data = await res.json();
+            console.log('Respuesta del server:', data);
+            return data;
+        } catch (e) {
+            console.error('Error:', e);
+            return e;
+        }
     }
     </script>
 </body>
