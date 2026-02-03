@@ -855,13 +855,34 @@
             while (m > 11) { m -= 12; y++; }
             
             const mesKey = getMonthKey(m, y);
-            const expensesMes = state.expenses.filter(e => e.mesPago === mesKey);
+            
+            // Filtrar gastos que corresponden a este mes
+            // Usar mesPago si existe, sino calcular dinámicamente para tarjetas
+            const expensesMes = state.expenses.filter(e => {
+                const mesPagoNormalizado = (e.mesPago || '').trim();
+                if (mesPagoNormalizado) {
+                    return mesPagoNormalizado === mesKey;
+                }
+                // Si no tiene mesPago, calcular para tarjetas
+                const isTarjeta = e.payment?.includes('VISA') || e.payment?.includes('MASTER');
+                if (isTarjeta) {
+                    const mp = calcularMesPago(e.date);
+                    return mp.month === m && mp.year === y;
+                }
+                // Para no-tarjeta, usar mes de la fecha
+                if (!e.date) return false;
+                try {
+                    const d = new Date(e.date + 'T12:00:00');
+                    return d.getMonth() === m && d.getFullYear() === y;
+                } catch { return false; }
+            });
+            
             const tarjetaExpenses = expensesMes.filter(e => e.payment?.includes('VISA') || e.payment?.includes('MASTER'));
             
-            const visaARS = tarjetaExpenses.filter(e => e.currency === 'ARS' && e.payment?.includes('VISA')).reduce((s, e) => s + e.amount, 0);
-            const visaUSD = tarjetaExpenses.filter(e => e.currency === 'USD' && e.payment?.includes('VISA')).reduce((s, e) => s + e.amount, 0);
-            const masterARS = tarjetaExpenses.filter(e => e.currency === 'ARS' && e.payment?.includes('MASTER')).reduce((s, e) => s + e.amount, 0);
-            const masterUSD = tarjetaExpenses.filter(e => e.currency === 'USD' && e.payment?.includes('MASTER')).reduce((s, e) => s + e.amount, 0);
+            const visaARS = tarjetaExpenses.filter(e => e.currency === 'ARS' && e.payment?.includes('VISA')).reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+            const visaUSD = tarjetaExpenses.filter(e => e.currency === 'USD' && e.payment?.includes('VISA')).reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+            const masterARS = tarjetaExpenses.filter(e => e.currency === 'ARS' && e.payment?.includes('MASTER')).reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+            const masterUSD = tarjetaExpenses.filter(e => e.currency === 'USD' && e.payment?.includes('MASTER')).reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
             
             proyeccion.push({
                 mes: MONTHS[m].substring(0, 3),
