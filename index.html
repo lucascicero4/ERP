@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -336,7 +336,7 @@
     // CONFIG - PEGAR TU URL AQUÍ
     // ============================================================
     const CONFIG = {
-        SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbwUxSF8wq7De5M_qQVFY94GeKlJHCzPQnX5Yxt6--uzeapZjUjf5NgKjEYEkcGlXvQHNQ/exec', // <-- PEGAR TU GOOGLE APPS SCRIPT URL AQUÍ
+        SCRIPT_URL: '', // <-- PEGAR TU GOOGLE APPS SCRIPT URL AQUÍ
         FORM_URL: 'https://docs.google.com/forms/d/e/1FAIpQLSfzB0u8w1GjVxpVx1a83fMktjq9nOWKbfz1rRmo5Ijw2GGt7w/viewform', // Google Form para agregar gastos
         FORM_INGRESOS_URL: 'https://docs.google.com/forms/d/e/1FAIpQLSe_MNZXzVxC4NBhs3jjJdMM8ZBSHqhN-cGy3jE096IK_WYonw/viewform', // Google Form para ingresos
         VERSION: '5.2'
@@ -485,9 +485,8 @@
         else { text.textContent = 'Sincronizado'; }
     }
 
-    window.syncFromSheet = async function() {
+    window.syncFromSheet = async function(showToast = true) {
         setSyncStatus('syncing');
-        document.getElementById('loadingText').textContent = 'Cargando datos...';
         const result = await apiGet('getAll');
         if (result && result.success) {
             state.expenses = result.expenses || [];
@@ -496,28 +495,61 @@
             state.movimientos = result.movimientos || [];
             state.monthlyIncome = result.monthlyIncome || {};
             state.dolaresAhorro = result.config?.dolaresAhorro || 0;
+            state.lastSync = Date.now();
             saveLocalState();
             renderCurrentView();
             setSyncStatus('ok');
-            toast(`✓ ${state.expenses.length} gastos cargados`);
+            if (showToast) toast(`✓ ${state.expenses.length} gastos sincronizados`);
         } else {
             setSyncStatus('error');
-            toast('Error al sincronizar: ' + (result?.error || 'sin respuesta'), true);
+            if (showToast) toast('Error al sincronizar', true);
+        }
+    }
+    
+    // Sincronización inteligente: solo si pasaron más de 5 minutos
+    async function smartSync() {
+        const SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutos
+        const lastSync = state.lastSync || 0;
+        const now = Date.now();
+        
+        if (now - lastSync > SYNC_INTERVAL) {
+            console.log('⏰ Sync automático (pasaron más de 5 min)');
+            await syncFromSheet(false);
+        } else {
+            console.log('✓ Usando cache local (sync reciente)');
+            setSyncStatus('ok');
         }
     }
 
     async function initialLoad() {
-        document.getElementById('loadingText').textContent = 'Conectando...';
+        document.getElementById('loadingText').textContent = 'Cargando...';
+        
+        // 1. Cargar datos locales PRIMERO (instantáneo)
         loadLocalState();
-        if (CONFIG.SCRIPT_URL) {
-            await syncFromSheet();
+        
+        // 2. Si hay datos locales, mostrar inmediatamente
+        if (state.expenses.length > 0) {
+            document.getElementById('loadingOverlay').classList.add('hidden');
+            renderCurrentView();
+            
+            // 3. Sync en background si es necesario
+            if (CONFIG.SCRIPT_URL) {
+                smartSync();
+            }
         } else {
-            setSyncStatus('error');
-            document.getElementById('syncText').textContent = 'Sin URL';
-            toast('Falta configurar SCRIPT_URL', true);
+            // Primera vez - sync completo
+            if (CONFIG.SCRIPT_URL) {
+                document.getElementById('loadingText').textContent = 'Primera carga...';
+                await syncFromSheet();
+            } else {
+                setSyncStatus('error');
+                document.getElementById('syncText').textContent = 'Sin URL';
+                toast('Falta configurar SCRIPT_URL', true);
+            }
+            document.getElementById('loadingOverlay').classList.add('hidden');
+            renderCurrentView();
         }
-        document.getElementById('loadingOverlay').classList.add('hidden');
-        renderCurrentView();
+        
         fetchCotizaciones();
     }
 
@@ -530,6 +562,21 @@
 
     function saveLocalState() {
         try { localStorage.setItem('erp_lucas_v5', JSON.stringify(state)); } catch (e) {}
+    }
+    
+    // Agregar gasto al state local (sin re-sincronizar todo)
+    function addExpenseToLocalState(expense) {
+        const newId = state.expenses.length > 0 ? Math.max(...state.expenses.map(e => e.id)) + 1 : 1;
+        expense.id = newId;
+        expense.rowIndex = newId + 1;
+        state.expenses.push(expense);
+        saveLocalState();
+    }
+    
+    // Eliminar gasto del state local
+    function removeExpenseFromLocalState(rowIndex) {
+        state.expenses = state.expenses.filter(e => e.rowIndex !== rowIndex);
+        saveLocalState();
     }
 
     // ============================================================
@@ -620,6 +667,60 @@
         return Object.values(grupos).filter(g => {
             return g.cuotas.some(c => c.mesPago >= hoy);
         });
+    }
+    
+    // NUEVA: Obtener cuotas que se pagan en un mes específico
+    function getCuotasDelMes(month, year) {
+        const mesKey = getMonthKey(month, year);
+        const grupos = {};
+        
+        // Filtrar gastos con cuotas
+        const gastosConCuotas = state.expenses.filter(e => e.totalCuotas > 1);
+        
+        gastosConCuotas.forEach(e => {
+            let groupKey;
+            if (e.idGrupo) {
+                groupKey = e.idGrupo;
+            } else {
+                const descBase = (e.description || e.category || '').replace(/\s*\(cuota \d+\/\d+\)\s*/gi, '').trim();
+                groupKey = `${e.date}_${descBase}_${e.totalCuotas}_${e.currency}_${e.payment}`;
+            }
+            
+            if (!grupos[groupKey]) {
+                const nombreLimpio = (e.description || e.category || '').replace(/\s*\(cuota \d+\/\d+\)\s*/gi, '').trim();
+                grupos[groupKey] = {
+                    nombre: nombreLimpio || e.category,
+                    totalCuotas: e.totalCuotas,
+                    montoCuota: e.amount,
+                    cuotas: [],
+                    currency: e.currency,
+                    payment: e.payment
+                };
+            }
+            grupos[groupKey].cuotas.push(e);
+        });
+        
+        // Filtrar grupos que tienen una cuota en este mes específico
+        const resultado = [];
+        Object.values(grupos).forEach(g => {
+            // Ordenar cuotas por número de cuota
+            g.cuotas.sort((a, b) => (a.cuotaActual || 1) - (b.cuotaActual || 1));
+            
+            // Buscar si hay una cuota que se paga en este mes
+            const cuotaDelMes = g.cuotas.find(c => c.mesPago === mesKey);
+            if (cuotaDelMes) {
+                resultado.push({
+                    nombre: g.nombre,
+                    cuotaActual: cuotaDelMes.cuotaActual || 1,
+                    totalCuotas: g.totalCuotas,
+                    montoCuota: cuotaDelMes.amount,
+                    currency: g.currency,
+                    payment: g.payment
+                });
+            }
+        });
+        
+        return resultado;
     }
     
     const getCatTotals = (list, cur = null) => { const t = {}; Object.keys(CATS).forEach(c => t[c] = 0); list.forEach(e => { if (cur && e.currency !== cur) return; t[e.category in CATS ? e.category : 'Otros'] += e.amount; }); return t; };
@@ -943,23 +1044,28 @@
                 </div>
                 
                 ${cuotasPendientes.length > 0 ? `
-                <div class="card"><div class="card-title">📊 Cuotas Pendientes</div>
-                    ${cuotasPendientes.map(g => {
-                        const pagadas = g.cuotas.filter(c => c.mesPago < getMonthKey(getArgentinaDate().getMonth(), getArgentinaDate().getFullYear())).length;
-                        const pct = Math.round((pagadas / g.totalCuotas) * 100);
-                        return `
-                        <div class="cuotas-item">
-                            <div class="cuotas-header">
-                                <span class="cuotas-name">${g.nombre}</span>
-                                <span class="cuotas-total">${g.currency === 'USD' ? fmt(g.montoTotal, 'USD') : fmtShort(g.montoTotal)}</span>
+                <div class="card"><div class="card-title">📊 Cuotas a pagar en ${MONTHS[state.currentMonth]}</div>
+                    ${(() => {
+                        const cuotasDelMes = getCuotasDelMes(state.currentMonth, state.currentYear);
+                        if (cuotasDelMes.length === 0) {
+                            return '<div class="empty"><p>Sin cuotas este mes</p></div>';
+                        }
+                        return cuotasDelMes.map(c => {
+                            const pct = Math.round((c.cuotaActual / c.totalCuotas) * 100);
+                            return `
+                            <div class="cuotas-item">
+                                <div class="cuotas-header">
+                                    <span class="cuotas-name">${c.nombre}</span>
+                                    <span class="cuotas-total">${c.currency === 'USD' ? fmt(c.montoCuota, 'USD') : fmtShort(c.montoCuota)}</span>
+                                </div>
+                                <div class="cuotas-progress"><div class="cuotas-bar" style="width:${pct}%"></div></div>
+                                <div class="cuotas-meta">
+                                    <span>Cuota ${c.cuotaActual}/${c.totalCuotas}</span>
+                                    <span>${c.payment}</span>
+                                </div>
                             </div>
-                            <div class="cuotas-progress"><div class="cuotas-bar" style="width:${pct}%"></div></div>
-                            <div class="cuotas-meta">
-                                <span>${pagadas}/${g.totalCuotas} pagadas</span>
-                                <span>${g.currency === 'USD' ? fmt(g.montoTotal / g.totalCuotas, 'USD') : fmtShort(g.montoTotal / g.totalCuotas)}/cuota</span>
-                            </div>
-                        </div>
-                    `;}).join('')}
+                        `;}).join('');
+                    })()}
                 </div>` : ''}
                 
                 <div class="card"><div class="card-title">Consumos a pagar en ${MONTHS[state.currentMonth]}</div><div class="tx-list">${tarjetaExpenses.length ? renderTransactionList(tarjetaExpenses) : '<div class="empty"><p>Sin consumos</p></div>'}</div></div>
